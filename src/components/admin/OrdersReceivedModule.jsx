@@ -1,0 +1,347 @@
+import { useState, useMemo } from 'react'
+import { ordersData, pharmacyProfiles, users } from '../../data/adminData'
+import Badge from '../ui/Badge'
+import logo from '../../assets/Dron_Salud.png'
+
+function formatCurrency(n) {
+  return '$' + n.toLocaleString()
+}
+
+function PharmacyInstructions({ order, client, profile, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gradient-to-br from-emerald-800 via-teal-900 to-green-900" style={{ backgroundSize: '200% 200%' }}>
+      <div className="w-full max-w-lg mx-4 text-center animate-fade-in">
+        <div className="mb-6">
+          <img src={logo} alt="Dron Salud" className="w-36 h-36 object-contain animate-float mx-auto" />
+        </div>
+
+        <h2 className="text-2xl font-bold text-white font-['Plus_Jakarta_Sans'] mb-2">Pedido Preparado</h2>
+        <p className="text-emerald-200 text-sm mb-8">El pedido esta preparado, el operador asignara un dron</p>
+
+        <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/10 text-left mb-6">
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-sm">1</div>
+              <div>
+                <div className="text-sm font-bold text-white">Prepara el pedido</div>
+                <div className="text-xs text-emerald-200 mt-0.5">Verifica los productos y asegurate de que coincidan con la orden.</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-sm">2</div>
+              <div>
+                <div className="text-sm font-bold text-white">Empaca de forma segura</div>
+                <div className="text-xs text-emerald-200 mt-0.5">Coloca los productos en el compartimento del dron. Asegurate de que queden bien ajustados.</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-sm">3</div>
+              <div>
+                <div className="text-sm font-bold text-white">Coloca el dron en la plataforma</div>
+                <div className="text-xs text-emerald-200 mt-0.5">Ubica el dron en la plataforma de despegue designada. Verifica que el area este despejada.</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-sm">4</div>
+              <div>
+                <div className="text-sm font-bold text-white">Alejate para el despegue</div>
+                <div className="text-xs text-emerald-200 mt-0.5">Mantente a una distancia segura durante el despegue. El dron seguira su ruta automaticamente.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white/10 backdrop-blur-md rounded-3xl p-5 border border-white/10 text-left mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-bold text-white">Resumen de la orden</span>
+            <span className="text-xs text-emerald-300">{order.productos.reduce((s, i) => s + i.cantidad, 0)} producto{order.productos.reduce((s, i) => s + i.cantidad, 0) !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="space-y-1.5 text-xs">
+            {order.productos.map((p, i) => (
+              <div key={i} className="flex justify-between text-emerald-100">
+                <span>{p.nombre} x {p.cantidad}</span>
+                <span className="font-semibold text-white">{formatCurrency(p.precio * p.cantidad)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-white/10 mt-3 pt-3 flex justify-between text-sm">
+            <span className="font-bold text-white">Total</span>
+            <span className="font-bold text-emerald-300">{formatCurrency(order.total)}</span>
+          </div>
+        </div>
+
+        {client && (
+          <div className="text-xs text-emerald-200 mb-1">
+            Cliente: {client.nombre} &middot; {client.telefono}
+          </div>
+        )}
+        {order.destino && (
+          <div className="text-xs text-emerald-200 mb-6">
+            Destino: {order.destino.direccion}
+          </div>
+        )}
+
+        <button
+          onClick={onClose}
+          className="bg-white/20 hover:bg-white/30 text-white font-bold py-3 px-8 rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/20 active:scale-[0.97]"
+        >
+          Volver a ordenes
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ConfirmModal({ message, onConfirm, onCancel }) {
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onCancel}>
+      <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm mx-4 w-full animate-scale-in" onClick={(e) => e.stopPropagation()}>
+        <p className="text-gray-800 text-sm font-semibold text-center mb-6">{message}</p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl transition-all duration-200 active:scale-[0.97]"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold py-3 rounded-xl transition-all duration-200 shadow-lg shadow-emerald-500/25 active:scale-[0.97]"
+          >
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function OrdersReceivedModule({ user }) {
+  const farmaciaId = user?.farmaciaId || 'FARM-001'
+  const [selected, setSelected] = useState(null)
+  const [localOrders, setLocalOrders] = useState(ordersData)
+  const [showInstructions, setShowInstructions] = useState(null)
+  const [confirmReady, setConfirmReady] = useState(null)
+
+  const pharmacyOrders = useMemo(
+    () => localOrders.filter((o) => o.farmaciaId === farmaciaId),
+    [farmaciaId, localOrders]
+  )
+
+  const order = selected
+    ? localOrders.find((o) => o.id === selected)
+    : null
+
+  const profile = order
+    ? pharmacyProfiles.find((p) => p.id === order.farmaciaId)
+    : null
+
+  const client = order
+    ? users.find((u) => u.id === order.clienteId)
+    : null
+
+  function markReady(id) {
+    setLocalOrders((prev) =>
+      prev.map((o) =>
+        o.id === id ? { ...o, estado: 'Preparado' } : o
+      )
+    )
+    setConfirmReady(null)
+    setShowInstructions(id)
+  }
+
+  const sortedOrders = useMemo(
+    () => [...pharmacyOrders].sort((a, b) => {
+      const orderPriorities = { 'Preparando': 0, 'Preparado': 1, 'En tránsito': 2, 'Entregado': 3 }
+      return (orderPriorities[a.estado] ?? 9) - (orderPriorities[b.estado] ?? 9)
+    }),
+    [pharmacyOrders]
+  )
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Ordenes Recibidas</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            {pharmacyOrders.length} orden{pharmacyOrders.length !== 1 ? 'es' : ''} recibida{pharmacyOrders.length !== 1 ? 's' : ''}
+          </p>
+        </div>
+        <span className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white text-xs font-bold rounded-full px-4 py-1.5 shadow-md">
+          {pharmacyOrders.filter((o) => o.estado === 'Preparando' || o.estado === 'Preparado').length} activas
+        </span>
+      </div>
+
+      <div className="grid gap-5 grid-cols-1 xl:grid-cols-[1fr_1fr]">
+        <div className="card-hover bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 p-6">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs font-semibold text-gray-500 uppercase tracking-widest border-b border-gray-100">
+                  <th className="text-left pb-3 pr-4">Orden</th>
+                  <th className="text-left pb-3 pr-4">Cliente</th>
+                  <th className="text-left pb-3 pr-4">Items</th>
+                  <th className="text-left pb-3 pr-4">Total</th>
+                  <th className="text-left pb-3">Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pharmacyOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="py-12 text-center text-gray-400 text-sm">
+                      No hay ordenes recibidas
+                    </td>
+                  </tr>
+                ) : (
+                  sortedOrders.map((o, i) => {
+                    const c = users.find((u) => u.id === o.clienteId)
+                    return (
+                      <tr
+                        key={o.id}
+                        onClick={() => setSelected(selected === o.id ? null : o.id)}
+                        className={`border-b border-gray-50 transition-colors cursor-pointer animate-fade-in ${
+                          selected === o.id ? 'bg-emerald-50' : 'hover:bg-emerald-50'
+                        }`}
+                        style={{ animationDelay: `${i * 30}ms` }}
+                      >
+                        <td className="py-3 pr-4 text-emerald-600 font-semibold whitespace-nowrap">{o.id}</td>
+                        <td className="py-3 pr-4 text-gray-800 font-medium">{c?.nombre || 'Cliente'}</td>
+                        <td className="py-3 pr-4 text-gray-600">{o.productos.length}</td>
+                        <td className="py-3 pr-4 text-gray-800 font-semibold whitespace-nowrap">{formatCurrency(o.total)}</td>
+                        <td className="py-3 text-gray-500 text-xs whitespace-nowrap">{o.fecha}</td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="card-hover bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 p-6">
+          {order ? (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">{order.id}</h3>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{order.fecha}</p>
+                </div>
+                <Badge text={order.estado} />
+              </div>
+
+              {client && (
+                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-4 border border-emerald-200">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold shadow-md">
+                      {client.nombre?.charAt(0) || '?'}
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-gray-800">{client.nombre}</div>
+                      <div className="text-xs text-gray-500">{client.telefono}</div>
+                      {client.direccion && <div className="text-xs text-gray-400 mt-0.5">{client.direccion}</div>}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-3">Productos</div>
+                <div className="space-y-2">
+                  {order.productos.map((p, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm bg-gray-50 rounded-xl p-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-sm flex-shrink-0 font-bold text-emerald-500">
+                          Rx
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-800">{p.nombre}</div>
+                          <div className="text-xs text-gray-500">x{p.cantidad}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-gray-800">{formatCurrency(p.precio * p.cantidad)}</div>
+                        <div className="text-[10px] text-gray-400">{formatCurrency(p.precio)} c/u</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100 pt-4 space-y-1.5 text-sm">
+                <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{formatCurrency(order.subtotal)}</span></div>
+                <div className="flex justify-between text-gray-600"><span>Envio</span><span>{formatCurrency(order.cargo_dron)}</span></div>
+                <div className="flex justify-between text-gray-600"><span>IVA</span><span>{formatCurrency(order.iva)}</span></div>
+                <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100">
+                  <span className="text-gray-900">Total</span>
+                  <span className="bg-gradient-to-r from-emerald-700 to-teal-700 bg-clip-text text-transparent">{formatCurrency(order.total)}</span>
+                </div>
+              </div>
+
+              {order.destino && (
+                <div className="bg-gray-50 rounded-2xl p-4">
+                  <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-2">Destino de entrega</div>
+                  <div className="text-sm font-semibold text-gray-800">{order.destino.nombre}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{order.destino.direccion}</div>
+                </div>
+              )}
+
+              {(order.estado === 'Preparando' || order.estado === 'Preparado') && (
+                <div className="pt-2">
+                  {order.estado === 'Preparando' && (
+                    <button
+                      onClick={() => setConfirmReady(order.id)}
+                      className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold py-3.5 rounded-xl transition-all duration-200 shadow-lg shadow-emerald-500/25 hover:shadow-xl active:scale-[0.97]"
+                    >
+                      Preparado
+                    </button>
+                  )}
+                  {order.estado === 'Preparado' && (
+                    <div className="flex items-center justify-center text-amber-600 text-sm font-semibold bg-amber-50 rounded-xl px-4 py-3 border border-amber-200">
+                      Pedido preparado, esperando operador
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {(order.estado === 'Entregado' || order.estado === 'En tránsito') && (
+                <div className="pt-2">
+                  <div className="text-gray-500 text-sm bg-gray-50 rounded-xl px-4 py-3 border border-gray-200 text-center">
+                    {order.estado === 'Entregado' ? 'Orden entregada al cliente' : 'Dron en camino al destino'}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-gray-400">
+              <p className="text-sm font-semibold">Selecciona una orden</p>
+              <p className="text-xs">Haz clic en una orden para ver sus detalles</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {confirmReady && (
+        <ConfirmModal
+          message="¿Estas seguro de marcar esta orden como preparada?"
+          onConfirm={() => markReady(confirmReady)}
+          onCancel={() => setConfirmReady(null)}
+        />
+      )}
+
+      {showInstructions && (() => {
+        const ord = localOrders.find((o) => o.id === showInstructions)
+        if (!ord) return null
+        const cli = users.find((u) => u.id === ord.clienteId)
+        const prof = pharmacyProfiles.find((p) => p.id === ord.farmaciaId)
+        return (
+          <PharmacyInstructions
+            order={ord}
+            client={cli}
+            profile={prof}
+            onClose={() => setShowInstructions(null)}
+          />
+        )
+      })()}
+    </div>
+  )
+}

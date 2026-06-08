@@ -1,14 +1,42 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/assets/drone_salud.png" />
+    <link rel="icon" type="image/png" href="/Dron_Salud.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Tailwind CDN for rapid prototyping -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <title>drone_salud</title>
-    <script type="module" crossorigin src="/assets/index-M9QjhDou.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DykytF2W.css">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-out',
+              'fade-in-up': 'fadeInUp 0.5s ease-out',
+              'fade-in-down': 'fadeInDown 0.4s ease-out',
+              'slide-in-left': 'slideInLeft 0.3s ease-out',
+              'scale-in': 'scaleIn 0.3s ease-out',
+              'pulse-soft': 'pulseSoft 3s ease-in-out infinite',
+              shimmer: 'shimmer 2s linear infinite',
+            },
+            keyframes: {
+              fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+              fadeInUp: { '0%': { opacity: '0', transform: 'translateY(20px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+              fadeInDown: { '0%': { opacity: '0', transform: 'translateY(-10px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+              slideInLeft: { '0%': { opacity: '0', transform: 'translateX(-10px)' }, '100%': { opacity: '1', transform: 'translateX(0)' } },
+              scaleIn: { '0%': { opacity: '0', transform: 'scale(0.95)' }, '100%': { opacity: '1', transform: 'scale(1)' } },
+              pulseSoft: { '0%, 100%': { opacity: '1' }, '50%': { opacity: '0.7' } },
+              shimmer: { '0%': { transform: 'translateX(-100%)' }, '100%': { transform: 'translateX(100%)' } },
+            },
+          },
+        },
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <title>Dron Salud — Logística Médica Inteligente</title>
+    <script type="module" crossorigin src="/assets/index-Ce6DtnHo.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-D758puhd.css">
   </head>
   <body>
     <div id="root"></div>
