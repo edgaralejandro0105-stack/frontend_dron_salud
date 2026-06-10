@@ -1,7 +1,7 @@
 import { fleetData } from '../../data/adminData'
-import Badge from '../ui/Badge'
+import Badge from '../../components/ui/Badge'
 
-export default function FleetModule() {
+export default function FleetPage() {
   return (
     <>
       <div className="grid gap-5 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">

@@ -5,7 +5,7 @@ function formatCurrency(n) {
   return '$' + n.toLocaleString()
 }
 
-export default function PharmacyOrderHistory({ user }) {
+export default function OrderHistoryPage({ user }) {
   const farmaciaId = user?.farmaciaId || 'FARM-001'
   const [selected, setSelected] = useState(null)
 

@@ -30,7 +30,7 @@ function ClickMarker({ position, onMove }) {
 const inputClass = 'w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 focus:bg-white transition-all duration-200 text-sm'
 const labelClass = 'text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5 block'
 
-export default function AdminManagement() {
+export default function UserManagementPage() {
   const [tab, setTab] = useState('operador')
   const [msg, setMsg] = useState(null)
   const resolvingRef = useRef(false)

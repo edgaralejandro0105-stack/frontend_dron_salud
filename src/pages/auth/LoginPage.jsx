@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { users } from '../data/adminData'
-import logo from '../assets/Dron_Salud.png'
-import SupportButton from './ui/SupportButton'
-import DroneDelivery from './ui/DroneDelivery'
+import { users } from '../../data/adminData'
+import logo from '../../assets/Dron_Salud.png'
+import SupportButton from '../../components/ui/SupportButton'
+import DroneDelivery from '../../components/ui/DroneDelivery'
 
 function InputField({ label, type = 'text', placeholder = '', icon = null, value, onChange, name }) {
   return (
@@ -59,7 +59,7 @@ function LoginFooter({ onCreate }) {
   )
 }
 
-export default function LoginFormView({ onCreateAccount, onLoginSuccess }) {
+export default function LoginPage({ onCreateAccount, onLoginSuccess }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)

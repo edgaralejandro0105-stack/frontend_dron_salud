@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { ordersData, pharmacyProfiles } from '../../data/adminData'
-import Badge from '../ui/Badge'
+import Badge from '../../components/ui/Badge'
 
 function formatCurrency(n) {
   return '$' + n.toLocaleString()
 }
 
-export default function OrdersModule() {
+export default function OrdersPage() {
   const [selected, setSelected] = useState(null)
 
   const order = selected
@@ -63,13 +63,11 @@ export default function OrdersModule() {
         <div className="card-hover bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 p-6">
           {order ? (
             <div className="space-y-6">
-              {/* Header */}
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-800">Detalle del Pedido</h3>
                 <Badge text={order.estado} />
               </div>
 
-              {/* Pharmacy info */}
               {profile && (
                 <div className="bg-gradient-to-br from-sky-50/50 to-blue-50/50 rounded-2xl p-5 space-y-3 border border-indigo-100/50">
                   <div className="flex items-center gap-3">
@@ -94,7 +92,6 @@ export default function OrdersModule() {
                 </div>
               )}
 
-              {/* Products table */}
               <div>
                 <div className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-3">Productos</div>
                 <div className="overflow-x-auto">
@@ -151,4 +148,3 @@ export default function OrdersModule() {
     </>
   )
 }
-

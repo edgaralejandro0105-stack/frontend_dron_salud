@@ -1,32 +1,32 @@
 import { useState, useEffect } from 'react'
-import logo from '../../assets/Dron_Salud.png'
-import SidebarItem from '../ui/SidebarItem'
-import UserProfileCard from './UserProfileCard'
-import DashboardModule from './DashboardModule'
-import InventoryModule from './InventoryModule'
-import OrdersModule from './OrdersModule'
-import FleetModule from './FleetModule'
-import ShoppingModule from './ShoppingModule'
-import OperatorPanelView from '../operator/OperatorPanelView'
-import OrdersReceivedModule from './OrdersReceivedModule'
-import PharmacyOrderHistory from './PharmacyOrderHistory'
-import PharmacyDashboard from './PharmacyDashboard'
-import OperatorHistory from '../operator/OperatorHistory'
-import AdminManagement from './AdminManagement'
-import SupportButton from '../ui/SupportButton'
+import logo from '../assets/Dron_Salud.png'
+import SidebarItem from '../components/ui/SidebarItem'
+import UserProfileCard from '../components/ui/UserProfileCard'
+import DashboardPage from '../pages/admin/DashboardPage'
+import InventoryPage from '../pages/pharmacy/InventoryPage'
+import OrdersPage from '../pages/admin/OrdersPage'
+import FleetPage from '../pages/admin/FleetPage'
+import NewOrderPage from '../pages/client/NewOrderPage'
+import DispatchPage from '../pages/operator/DispatchPage'
+import OrdersReceivedPage from '../pages/pharmacy/OrdersReceivedPage'
+import OrderHistoryPage from '../pages/pharmacy/OrderHistoryPage'
+import PharmacyDashboardPage from '../pages/pharmacy/DashboardPage'
+import OperatorHistoryPage from '../pages/operator/HistoryPage'
+import UserManagementPage from '../pages/admin/UserManagementPage'
+import SupportButton from '../components/ui/SupportButton'
 
 const moduleMap = {
-  dashboard: DashboardModule,
-  inventory: InventoryModule,
-  orders: OrdersModule,
-  fleet: FleetModule,
-  shopping: ShoppingModule,
-  operator: OperatorPanelView,
-  ordersReceived: OrdersReceivedModule,
-  pharmacyHistory: PharmacyOrderHistory,
-  pharmacyDashboard: PharmacyDashboard,
-  operatorHistory: OperatorHistory,
-  adminManagement: AdminManagement,
+  dashboard: DashboardPage,
+  inventory: InventoryPage,
+  orders: OrdersPage,
+  fleet: FleetPage,
+  shopping: NewOrderPage,
+  operator: DispatchPage,
+  ordersReceived: OrdersReceivedPage,
+  pharmacyHistory: OrderHistoryPage,
+  pharmacyDashboard: PharmacyDashboardPage,
+  operatorHistory: OperatorHistoryPage,
+  adminManagement: UserManagementPage,
 }
 
 function Clock({ date }) {
@@ -46,10 +46,11 @@ function Clock({ date }) {
   )
 }
 
-export default function AdminPanelView({ modules, moduleTitles, user, onLogout }) {
+export default function DashboardLayout({ modules, moduleTitles, user, onLogout }) {
   const [activeModule, setActiveModule] = useState(modules[0]?.key || 'dashboard')
   const [showProfile, setShowProfile] = useState(false)
   const [clock, setClock] = useState(new Date())
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     const id = setInterval(() => setClock(new Date()), 1000)
@@ -58,9 +59,14 @@ export default function AdminPanelView({ modules, moduleTitles, user, onLogout }
 
   const ModuleComponent = moduleMap[activeModule]
 
+  function closeSidebar() { setSidebarOpen(false) }
+
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/40 overflow-hidden">
-      <aside className="w-64 flex-shrink-0 flex flex-col bg-gradient-to-b from-[#0b1a30] via-[#0f2248] to-[#142d52] border-r border-white/5">
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={closeSidebar} />
+      )}
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 flex-shrink-0 flex flex-col bg-gradient-to-b from-[#0b1a30] via-[#0f2248] to-[#142d52] border-r border-white/5 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="p-5">
           <div className="flex items-center gap-3 mb-8 animate-fade-in-down">
             <div className="relative">
@@ -82,7 +88,7 @@ export default function AdminPanelView({ modules, moduleTitles, user, onLogout }
                   icon={m.icon}
                   label={m.label}
                   active={activeModule === m.key}
-                  onClick={() => setActiveModule(m.key)}
+                  onClick={() => { setActiveModule(m.key); closeSidebar() }}
                 />
               </div>
             ))}
@@ -125,18 +131,21 @@ export default function AdminPanelView({ modules, moduleTitles, user, onLogout }
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50/40">
-        <header className="flex-shrink-0 flex items-center justify-between px-8 py-4 border-b border-gray-100/80 bg-white/40 backdrop-blur-xl">
-          <div className="animate-fade-in">
-            <h1 className="text-2xl font-bold text-gray-900 font-['Plus_Jakarta_Sans']">
+        <header className="flex-shrink-0 flex items-center justify-between gap-4 px-4 sm:px-8 py-3 sm:py-4 border-b border-gray-100/80 bg-white/40 backdrop-blur-xl">
+          <div className="flex items-center gap-3 min-w-0 animate-fade-in">
+            <button onClick={() => setSidebarOpen(true)} className="lg:hidden w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 flex-shrink-0">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </button>
+            <h1 className="text-lg sm:text-2xl font-bold text-gray-900 font-['Plus_Jakarta_Sans'] truncate">
               <span className="bg-gradient-to-r from-sky-700 to-blue-700 bg-clip-text text-transparent">{moduleTitles?.[activeModule] || activeModule}</span>
             </h1>
           </div>
-          <div className="flex items-center gap-4 animate-fade-in">
+          <div className="flex items-center gap-4 animate-fade-in flex-shrink-0">
             <Clock date={clock} />
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-8 animate-fade-in">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 animate-fade-in">
           {ModuleComponent ? <ModuleComponent user={user} /> : (
             <div className="flex items-center justify-center h-full text-gray-400">
               <span>Módulo no disponible</span>

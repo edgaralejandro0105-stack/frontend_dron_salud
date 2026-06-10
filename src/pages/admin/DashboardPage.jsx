@@ -1,13 +1,13 @@
 import { useMemo } from 'react'
 import { ordersData, monthlyData, pharmaciesData } from '../../data/adminData'
-import AreaChartSVG from '../charts/AreaChart'
-import BarChartSVG from '../charts/BarChart'
+import AreaChartSVG from '../../components/charts/AreaChart'
+import BarChartSVG from '../../components/charts/BarChart'
 
 function formatCurrency(n) {
   return '$' + n.toLocaleString()
 }
 
-export default function DashboardModule() {
+export default function DashboardPage() {
   const stats = useMemo(() => {
     const total = ordersData.length
     const entregados = ordersData.filter((o) => o.estado === 'Entregado').length

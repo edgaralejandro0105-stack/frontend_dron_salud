@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { ordersData, pharmacyProfiles, users } from '../../data/adminData'
-import Badge from '../ui/Badge'
+import Badge from '../../components/ui/Badge'
 import logo from '../../assets/Dron_Salud.png'
 
 function formatCurrency(n) {
@@ -9,81 +9,81 @@ function formatCurrency(n) {
 
 function PharmacyInstructions({ order, client, profile, onClose }) {
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gradient-to-br from-emerald-800 via-teal-900 to-green-900" style={{ backgroundSize: '200% 200%' }}>
-      <div className="w-full max-w-lg mx-4 text-center animate-fade-in">
-        <div className="mb-6">
-          <img src={logo} alt="Dron Salud" className="w-36 h-36 object-contain animate-float mx-auto" />
+    <div className="fixed inset-0 z-[70] flex flex-col items-center justify-start bg-gradient-to-br from-emerald-800 via-teal-900 to-green-900 overflow-y-auto" style={{ backgroundSize: '200% 200%' }}>
+      <div className="w-full max-w-lg mx-auto text-center animate-fade-in py-6 sm:py-8 px-4">
+        <div className="mb-4 sm:mb-6">
+          <img src={logo} alt="Dron Salud" className="w-24 h-24 sm:w-28 sm:h-28 lg:w-36 lg:h-36 object-contain animate-float mx-auto" />
         </div>
 
-        <h2 className="text-2xl font-bold text-white font-['Plus_Jakarta_Sans'] mb-2">Pedido Preparado</h2>
-        <p className="text-emerald-200 text-sm mb-8">El pedido esta preparado, el operador asignara un dron</p>
+        <h2 className="text-xl sm:text-2xl font-bold text-white font-['Plus_Jakarta_Sans'] mb-1 sm:mb-2">Pedido Preparado</h2>
+        <p className="text-emerald-200 text-xs sm:text-sm mb-4 sm:mb-8">El pedido esta preparado, el operador asignara un dron</p>
 
-        <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/10 text-left mb-6">
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-sm">1</div>
+        <div className="bg-white/10 backdrop-blur-md rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/10 text-left mb-4 sm:mb-6">
+          <div className="space-y-3 sm:space-y-4">
+            <div className="flex items-start gap-2 sm:gap-3">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-[10px] sm:text-sm">1</div>
               <div>
-                <div className="text-sm font-bold text-white">Prepara el pedido</div>
-                <div className="text-xs text-emerald-200 mt-0.5">Verifica los productos y asegurate de que coincidan con la orden.</div>
+                <div className="text-xs sm:text-sm font-bold text-white">Prepara el pedido</div>
+                <div className="text-[10px] sm:text-xs text-emerald-200 mt-0.5">Verifica los productos y asegurate de que coincidan con la orden.</div>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-sm">2</div>
+            <div className="flex items-start gap-2 sm:gap-3">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-[10px] sm:text-sm">2</div>
               <div>
-                <div className="text-sm font-bold text-white">Empaca de forma segura</div>
-                <div className="text-xs text-emerald-200 mt-0.5">Coloca los productos en el compartimento del dron. Asegurate de que queden bien ajustados.</div>
+                <div className="text-xs sm:text-sm font-bold text-white">Empaca de forma segura</div>
+                <div className="text-[10px] sm:text-xs text-emerald-200 mt-0.5">Coloca los productos en el compartimento del dron. Asegurate de que queden bien ajustados.</div>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-sm">3</div>
+            <div className="flex items-start gap-2 sm:gap-3">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-[10px] sm:text-sm">3</div>
               <div>
-                <div className="text-sm font-bold text-white">Coloca el dron en la plataforma</div>
-                <div className="text-xs text-emerald-200 mt-0.5">Ubica el dron en la plataforma de despegue designada. Verifica que el area este despejada.</div>
+                <div className="text-xs sm:text-sm font-bold text-white">Coloca el dron en la plataforma</div>
+                <div className="text-[10px] sm:text-xs text-emerald-200 mt-0.5">Ubica el dron en la plataforma de despegue designada. Verifica que el area este despejada.</div>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-sm">4</div>
+            <div className="flex items-start gap-2 sm:gap-3">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-[10px] sm:text-sm">4</div>
               <div>
-                <div className="text-sm font-bold text-white">Alejate para el despegue</div>
-                <div className="text-xs text-emerald-200 mt-0.5">Mantente a una distancia segura durante el despegue. El dron seguira su ruta automaticamente.</div>
+                <div className="text-xs sm:text-sm font-bold text-white">Alejate para el despegue</div>
+                <div className="text-[10px] sm:text-xs text-emerald-200 mt-0.5">Mantente a una distancia segura durante el despegue. El dron seguira su ruta automaticamente.</div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-md rounded-3xl p-5 border border-white/10 text-left mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-bold text-white">Resumen de la orden</span>
-            <span className="text-xs text-emerald-300">{order.productos.reduce((s, i) => s + i.cantidad, 0)} producto{order.productos.reduce((s, i) => s + i.cantidad, 0) !== 1 ? 's' : ''}</span>
+        <div className="bg-white/10 backdrop-blur-md rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-white/10 text-left mb-4 sm:mb-6">
+          <div className="flex items-center justify-between mb-2 sm:mb-3">
+            <span className="text-xs sm:text-sm font-bold text-white">Resumen de la orden</span>
+            <span className="text-[10px] sm:text-xs text-emerald-300">{order.productos.reduce((s, i) => s + i.cantidad, 0)} producto{order.productos.reduce((s, i) => s + i.cantidad, 0) !== 1 ? 's' : ''}</span>
           </div>
-          <div className="space-y-1.5 text-xs">
+          <div className="space-y-1 text-[10px] sm:text-xs">
             {order.productos.map((p, i) => (
-              <div key={i} className="flex justify-between text-emerald-100">
-                <span>{p.nombre} x {p.cantidad}</span>
-                <span className="font-semibold text-white">{formatCurrency(p.precio * p.cantidad)}</span>
+              <div key={i} className="flex justify-between text-emerald-100 gap-2">
+                <span className="text-left truncate">{p.nombre} x {p.cantidad}</span>
+                <span className="font-semibold text-white flex-shrink-0">{formatCurrency(p.precio * p.cantidad)}</span>
               </div>
             ))}
           </div>
-          <div className="border-t border-white/10 mt-3 pt-3 flex justify-between text-sm">
+          <div className="border-t border-white/10 mt-2 sm:mt-3 pt-2 sm:pt-3 flex justify-between text-xs sm:text-sm">
             <span className="font-bold text-white">Total</span>
             <span className="font-bold text-emerald-300">{formatCurrency(order.total)}</span>
           </div>
         </div>
 
         {client && (
-          <div className="text-xs text-emerald-200 mb-1">
+          <div className="text-[10px] sm:text-xs text-emerald-200 mb-1 sm:mb-2">
             Cliente: {client.nombre} &middot; {client.telefono}
           </div>
         )}
         {order.destino && (
-          <div className="text-xs text-emerald-200 mb-6">
+          <div className="text-[10px] sm:text-xs text-emerald-200 mb-4 sm:mb-6">
             Destino: {order.destino.direccion}
           </div>
         )}
 
         <button
           onClick={onClose}
-          className="bg-white/20 hover:bg-white/30 text-white font-bold py-3 px-8 rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/20 active:scale-[0.97]"
+          className="bg-white/20 hover:bg-white/30 text-white font-bold py-2.5 sm:py-3 px-6 sm:px-8 rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/20 active:scale-[0.97] text-sm sm:text-base"
         >
           Volver a ordenes
         </button>
@@ -116,7 +116,7 @@ function ConfirmModal({ message, onConfirm, onCancel }) {
   )
 }
 
-export default function OrdersReceivedModule({ user }) {
+export default function OrdersReceivedPage({ user }) {
   const farmaciaId = user?.farmaciaId || 'FARM-001'
   const [selected, setSelected] = useState(null)
   const [localOrders, setLocalOrders] = useState(ordersData)

@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import LoginFormView from './components/LoginFormView'
-import RegisterFormView from './components/RegisterFormView'
-import AdminPanelView from './components/admin/AdminPanelView'
-import ClientShoppingView from './components/client/ClientShoppingView'
+import LoginPage from './pages/auth/LoginPage'
+import RegisterPage from './pages/auth/RegisterPage'
+import DashboardLayout from './layouts/DashboardLayout'
+import ShoppingPage from './pages/client/ShoppingPage'
 import { modules, moduleTitles, roleModules } from './data/adminData'
 
 function App() {
@@ -10,13 +10,13 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null)
 
   if (view === 'register') {
-    return <RegisterFormView onBackToLogin={() => setView('login')} />
+    return <RegisterPage onBackToLogin={() => setView('login')} />
   }
 
   if (view === 'panel' && currentUser) {
     if (currentUser.role === 'cliente') {
       return (
-        <ClientShoppingView
+        <ShoppingPage
           user={currentUser}
           onLogout={() => {
             setView('login')
@@ -30,7 +30,7 @@ function App() {
     const allowedModules = modules.filter((m) => allowedKeys.includes(m.key))
 
     return (
-      <AdminPanelView
+      <DashboardLayout
         modules={allowedModules}
         moduleTitles={moduleTitles}
         user={currentUser}
@@ -43,7 +43,7 @@ function App() {
   }
 
   return (
-    <LoginFormView
+    <LoginPage
       onCreateAccount={() => setView('register')}
       onLoginSuccess={(user) => {
         setCurrentUser(user)

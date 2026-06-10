@@ -5,7 +5,7 @@ function formatCurrency(n) {
   return '$' + n.toLocaleString()
 }
 
-export default function PurchaseHistory({ user }) {
+export default function PurchaseHistoryPage({ user }) {
   const [selected, setSelected] = useState(null)
 
   const purchases = useMemo(() =>

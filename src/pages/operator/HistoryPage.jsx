@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react'
 import { ordersData, users } from '../../data/adminData'
-import Badge from '../ui/Badge'
+import Badge from '../../components/ui/Badge'
 
 function formatCurrency(n) {
   return '$' + n.toLocaleString()
 }
 
-export default function OperatorHistory() {
+export default function OperatorHistoryPage() {
   const [selected, setSelected] = useState(null)
 
   const deliveredOrders = useMemo(

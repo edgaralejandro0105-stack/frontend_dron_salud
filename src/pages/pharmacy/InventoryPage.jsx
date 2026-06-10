@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { inventoryData as initialData } from '../../data/adminData'
-import Badge from '../ui/Badge'
+import Badge from '../../components/ui/Badge'
 
 const unidades = ['Tabletas', 'Cápsulas', 'Ampollas', 'Frascos', 'ml', 'mg', 'Unidades']
 
@@ -16,7 +16,7 @@ function nextId(items) {
   return `MED-${String(max + 1).padStart(3, '0')}`
 }
 
-export default function InventoryModule() {
+export default function InventoryPage() {
   const [products, setProducts] = useState(initialData)
   const [showModal, setShowModal] = useState(false)
   const [search, setSearch] = useState('')

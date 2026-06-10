@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { ordersData, pharmacyProfiles, fleetData } from '../../data/adminData'
-import Badge from '../ui/Badge'
+import Badge from '../../components/ui/Badge'
 
 function ConfirmModal({ message, onConfirm, onCancel }) {
   return (
@@ -43,7 +43,7 @@ function mapsUrl(lat, lng) {
   return `https://www.google.com/maps?q=${lat},${lng}`
 }
 
-export default function OperatorPanelView({ user }) {
+export default function DispatchPage({ user }) {
   const [selectedOrderId, setSelectedOrderId] = useState(null)
   const [selectedDrone, setSelectedDrone] = useState('')
   const [launched, setLaunched] = useState(false)
@@ -154,7 +154,7 @@ export default function OperatorPanelView({ user }) {
       </div>
 
       {order && profile ? (
-        <div className="grid gap-6 grid-cols-1 xl:grid-cols-[1fr_1.1fr]">
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-[1fr_1.1fr]">
           <div className="space-y-5">
             <div className="card-hover bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 p-5">
               <div className="flex items-center justify-between mb-3">
@@ -170,7 +170,7 @@ export default function OperatorPanelView({ user }) {
                 <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-[10px]">D</span>
                 <span className="text-gray-600 truncate">{order.destino.nombre}</span>
               </div>
-              <div className="rounded-2xl overflow-hidden border border-gray-200 h-[290px]">
+              <div className="rounded-2xl overflow-hidden border border-gray-200 h-[200px] sm:h-[290px]">
                 <iframe title="route-map" src={mapEmbedUrl(profile.lat, profile.lng, order.destino.lat, order.destino.lng)} width="100%" height="100%" style={{ border: 0 }} allowFullScreen loading="lazy" />
               </div>
             </div>
@@ -189,7 +189,7 @@ export default function OperatorPanelView({ user }) {
                   <div className="text-gray-500">{profile.direccion}</div>
                 </div>
               </div>
-              <div className="rounded-2xl overflow-hidden border border-gray-200 h-[290px]">
+              <div className="rounded-2xl overflow-hidden border border-gray-200 h-[200px] sm:h-[290px]">
                 <iframe title="pharmacy-map" src={`https://maps.google.com/maps?q=${encodeURIComponent(profile.nombre + ', San Cristóbal, Táchira, Venezuela')}&z=16&output=embed`} width="100%" height="100%" style={{ border: 0 }} allowFullScreen loading="lazy" />
               </div>
             </div>
@@ -197,7 +197,7 @@ export default function OperatorPanelView({ user }) {
 
           <div className="space-y-4">
             <div className="card-hover bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 p-5">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm">{profile.nombre.charAt(0)}</div>
@@ -254,7 +254,7 @@ export default function OperatorPanelView({ user }) {
 
             <div className="card-hover bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 p-5">
               <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans'] mb-3">Seleccionar Dron</h3>
-              <div className="grid gap-2 mb-3">
+              <div className="space-y-2 mb-3">
                 {availableDrones.map(d => (
                   <label key={d.id} className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer transition-all duration-200 ${selectedDrone === d.id ? 'border-blue-300 bg-gradient-to-br from-sky-50/80 to-blue-50/80 shadow-sm' : 'border-gray-100 bg-white/80 hover:bg-blue-50/30 hover:border-blue-200'}`}>
                     <input type="radio" name="drone" value={d.id} checked={selectedDrone === d.id} onChange={() => setSelectedDrone(d.id)} className="accent-blue-600" />
@@ -302,4 +302,3 @@ export default function OperatorPanelView({ user }) {
     </div>
   )
 }
-

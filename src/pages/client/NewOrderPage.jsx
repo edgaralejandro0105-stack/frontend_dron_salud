@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react'
 import { inventoryData, pharmacyProfiles } from '../../data/adminData'
-import Badge from '../ui/Badge'
-import LocationPicker from './LocationPicker'
-import SupportButton from '../ui/SupportButton'
+import Badge from '../../components/ui/Badge'
+import LocationPicker from '../../components/maps/LocationPicker'
+import SupportButton from '../../components/ui/SupportButton'
 import logo from '../../assets/Dron_Salud.png'
 
 function formatCurrency(n) {
@@ -187,81 +187,81 @@ function DroneInstructions({ cart, profile, deliveryLocation, onBackToShop }) {
   const granTotal = cartTotal + cargoDron + iva
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gradient-to-br from-sky-900 via-blue-900 to-indigo-900" style={{ backgroundSize: '200% 200%' }}>
-      <div className="w-full max-w-lg mx-4 text-center animate-fade-in">
-        <div className="mb-6">
-          <img src={logo} alt="Dron Salud" className="w-40 h-40 object-contain animate-float mx-auto" />
+    <div className="fixed inset-0 z-[70] flex flex-col items-center justify-start bg-gradient-to-br from-sky-900 via-blue-900 to-indigo-900 overflow-y-auto" style={{ backgroundSize: '200% 200%' }}>
+      <div className="w-full max-w-lg mx-auto text-center animate-fade-in py-6 sm:py-8 px-4">
+        <div className="mb-4 sm:mb-6">
+          <img src={logo} alt="Dron Salud" className="w-24 h-24 sm:w-32 sm:h-32 lg:w-40 lg:h-40 object-contain animate-float mx-auto" />
         </div>
 
-        <h2 className="text-2xl font-bold text-white font-['Plus_Jakarta_Sans'] mb-2">Pedido Confirmado</h2>
-        <p className="text-sky-200 text-sm mb-8">Tu dron esta siendo preparado</p>
+        <h2 className="text-xl sm:text-2xl font-bold text-white font-['Plus_Jakarta_Sans'] mb-1 sm:mb-2">Pedido Confirmado</h2>
+        <p className="text-sky-200 text-xs sm:text-sm mb-4 sm:mb-8">Tu dron esta siendo preparado</p>
 
-        <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/10 text-left mb-6">
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-sm">1</div>
+        <div className="bg-white/10 backdrop-blur-md rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/10 text-left mb-4 sm:mb-6">
+          <div className="space-y-3 sm:space-y-4">
+            <div className="flex items-start gap-2 sm:gap-3">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-[10px] sm:text-sm">1</div>
               <div>
-                <div className="text-sm font-bold text-white">Preparacion del pedido</div>
-                <div className="text-xs text-sky-200 mt-0.5">La farmacia esta preparando tus productos. Tiempo estimado: 5-10 min.</div>
+                <div className="text-xs sm:text-sm font-bold text-white">Preparacion del pedido</div>
+                <div className="text-[10px] sm:text-xs text-sky-200 mt-0.5">La farmacia esta preparando tus productos. Tiempo estimado: 5-10 min.</div>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-sm">2</div>
+            <div className="flex items-start gap-2 sm:gap-3">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-[10px] sm:text-sm">2</div>
               <div>
-                <div className="text-sm font-bold text-white">Despegue del dron</div>
-                <div className="text-xs text-sky-200 mt-0.5">El dron despegara desde la farmacia hacia tu ubicacion.</div>
+                <div className="text-xs sm:text-sm font-bold text-white">Despegue del dron</div>
+                <div className="text-[10px] sm:text-xs text-sky-200 mt-0.5">El dron despegara desde la farmacia hacia tu ubicacion.</div>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-sm">3</div>
+            <div className="flex items-start gap-2 sm:gap-3">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-[10px] sm:text-sm">3</div>
               <div>
-                <div className="text-sm font-bold text-white">Alejate durante el descenso</div>
-                <div className="text-xs text-sky-200 mt-0.5">Cuando el dron este descendiendo, manten una distancia de seguridad. No te acerques hasta que haya aterrizado por completo.</div>
+                <div className="text-xs sm:text-sm font-bold text-white">Alejate durante el descenso</div>
+                <div className="text-[10px] sm:text-xs text-sky-200 mt-0.5">Cuando el dron este descendiendo, manten una distancia de seguridad. No te acerques hasta que haya aterrizado por completo.</div>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-sm">4</div>
+            <div className="flex items-start gap-2 sm:gap-3">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 text-white font-bold text-[10px] sm:text-sm">4</div>
               <div>
-                <div className="text-sm font-bold text-white">Retira tus productos</div>
-                <div className="text-xs text-sky-200 mt-0.5">Espera a que el dron apague sus motores por completo. Luego retira tus productos de forma segura.</div>
+                <div className="text-xs sm:text-sm font-bold text-white">Retira tus productos</div>
+                <div className="text-[10px] sm:text-xs text-sky-200 mt-0.5">Espera a que el dron apague sus motores por completo. Luego retira tus productos de forma segura.</div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-md rounded-3xl p-5 border border-white/10 text-left mb-8">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-bold text-white">Resumen del pedido</span>
-            <span className="text-xs text-sky-300">{cart.reduce((s, i) => s + i.qty, 0)} producto{cart.reduce((s, i) => s + i.qty, 0) !== 1 ? 's' : ''}</span>
+        <div className="bg-white/10 backdrop-blur-md rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-white/10 text-left mb-4 sm:mb-8">
+          <div className="flex items-center justify-between mb-2 sm:mb-3">
+            <span className="text-xs sm:text-sm font-bold text-white">Resumen del pedido</span>
+            <span className="text-[10px] sm:text-xs text-sky-300">{cart.reduce((s, i) => s + i.qty, 0)} producto{cart.reduce((s, i) => s + i.qty, 0) !== 1 ? 's' : ''}</span>
           </div>
-          <div className="space-y-1.5 text-xs">
+          <div className="space-y-1 text-[10px] sm:text-xs">
             {cart.map((item, i) => (
-              <div key={item.product.id} className="flex justify-between text-sky-100">
-                <span>{item.product.nombre} {item.product.concentracion} x {item.qty}</span>
-                <span className="font-semibold text-white">{formatCurrency(item.product.precio * item.qty)}</span>
+              <div key={item.product.id} className="flex justify-between text-sky-100 gap-2">
+                <span className="text-left truncate">{item.product.nombre} {item.product.concentracion} x {item.qty}</span>
+                <span className="font-semibold text-white flex-shrink-0">{formatCurrency(item.product.precio * item.qty)}</span>
               </div>
             ))}
           </div>
-          <div className="border-t border-white/10 mt-3 pt-3 flex justify-between text-sm">
+          <div className="border-t border-white/10 mt-2 sm:mt-3 pt-2 sm:pt-3 flex justify-between text-xs sm:text-sm">
             <span className="font-bold text-white">Total pagado</span>
             <span className="font-bold text-sky-300">{formatCurrency(granTotal)}</span>
           </div>
         </div>
 
         {profile && (
-          <div className="text-xs text-sky-300 mb-2">
+          <div className="text-[10px] sm:text-xs text-sky-300 mb-1 sm:mb-2">
             Origen: {profile.nombre} &middot; {profile.direccion}
           </div>
         )}
         {deliveryLocation && (
-          <div className="text-xs text-sky-300 mb-6">
+          <div className="text-[10px] sm:text-xs text-sky-300 mb-4 sm:mb-6">
             Destino: {deliveryLocation.direccion || deliveryLocation.address}
           </div>
         )}
 
         <button
           onClick={onBackToShop}
-          className="bg-white/20 hover:bg-white/30 text-white font-bold py-3 px-8 rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/20 active:scale-[0.97]"
+          className="bg-white/20 hover:bg-white/30 text-white font-bold py-2.5 sm:py-3 px-6 sm:px-8 rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/20 active:scale-[0.97] text-sm sm:text-base"
         >
           Volver a la tienda
         </button>
@@ -272,7 +272,7 @@ function DroneInstructions({ cart, profile, deliveryLocation, onBackToShop }) {
   )
 }
 
-export default function ShoppingModule({ user }) {
+export default function NewOrderPage({ user }) {
   const [selectedPharmacy, setSelectedPharmacy] = useState(null)
   const [cart, setCart] = useState([])
   const [showInvoice, setShowInvoice] = useState(false)
@@ -376,7 +376,6 @@ export default function ShoppingModule({ user }) {
     setFilterCategoria('todos')
   }
 
-  // ─── Step 1: Pharmacy Selection ──────────────────────────────────
   if (!selectedPharmacy) {
     return (
       <div>
@@ -417,13 +416,10 @@ export default function ShoppingModule({ user }) {
     )
   }
 
-  // ─── Step 2: Shopping (catalog + cart) ───────────────────────────
   return (
     <>
-    <div className="flex gap-6">
-      {/* Product Catalog */}
+      <div className="flex flex-col lg:flex-row gap-6">
       <div className="flex-1 min-w-0">
-        {/* Pharmacy bar */}
         <div className="flex items-center justify-between bg-white rounded-2xl px-5 py-4 mb-6 shadow-[0_4px_20px_rgb(0,0,0,0.04)] border border-gray-100">
           <div className="flex items-center gap-3">
              <button onClick={() => { setSelectedPharmacy(null); setCart([]); setDeliveryLocation(null) }} className="text-gray-400 hover:text-gray-600 transition-colors text-lg mr-1">←</button>
@@ -440,7 +436,6 @@ export default function ShoppingModule({ user }) {
           </div>
         </div>
 
-        {/* Search + Filters */}
         <div className="flex flex-wrap items-center gap-3 mb-5">
           <div className="relative flex-1 min-w-[200px] max-w-sm">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
@@ -498,9 +493,8 @@ export default function ShoppingModule({ user }) {
         )}
       </div>
 
-      {/* Cart Sidebar */}
-      <div className="w-80 flex-shrink-0">
-        <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 p-5 sticky top-0">
+      <div className="w-full lg:w-80 flex-shrink-0">
+        <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 p-5 lg:sticky lg:top-0">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">🛒 Carrito</h3>
             {cartCount > 0 && (
@@ -624,13 +618,11 @@ export default function ShoppingModule({ user }) {
   )
 }
 
-// ─── Product Card Component ────────────────────────────────────────
 function ProductCard({ product, inCart, stockOk, onAdd }) {
   const [qty, setQty] = useState(1)
 
   return (
     <div className="card-hover bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 p-5 flex flex-col">
-      {/* Photo or placeholder */}
       <div className="w-full h-36 rounded-xl bg-gradient-to-br from-sky-50 to-blue-50 flex items-center justify-center mb-4 overflow-hidden">
         {product.foto ? (
           <img src={product.foto} alt="" className="w-full h-full object-cover" />
@@ -639,7 +631,6 @@ function ProductCard({ product, inCart, stockOk, onAdd }) {
         )}
       </div>
 
-      {/* Info */}
       <div className="flex-1">
         <div className="flex items-start justify-between gap-2 mb-1">
           <h4 className="text-sm font-bold text-gray-800 leading-tight">
@@ -661,7 +652,6 @@ function ProductCard({ product, inCart, stockOk, onAdd }) {
         </div>
       </div>
 
-      {/* Add to cart */}
       <div className="flex items-center gap-2">
         <div className="flex items-center border border-gray-200 rounded-lg">
           <button
@@ -701,4 +691,3 @@ function ProductCard({ product, inCart, stockOk, onAdd }) {
     </div>
   )
 }
-

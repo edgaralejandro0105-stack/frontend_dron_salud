@@ -30,6 +30,18 @@ export const inventoryData = [
 
 export const ordersData = [
   {
+    id: 'ORD-3903', farmacia: 'Farmatodo', farmaciaId: 'FARM-001', clienteId: 'CLI-001',
+    estado: 'Preparando', dron: '—',
+    fecha: '08/06/2026 09:30',
+    productos: [
+      { id: 'MED-001', nombre: 'Ibuprofeno 400mg',  cantidad: 3, precio: 2500 },
+      { id: 'MED-004', nombre: 'Paracetamol 500mg', cantidad: 2, precio: 1800 },
+      { id: 'MED-007', nombre: 'Atorvastatina 20mg', cantidad: 1, precio: 8500 },
+    ],
+    subtotal: 17600, cargo_dron: 5000, iva: 2816, total: 25416,
+    destino: { nombre: 'Hospital Central', direccion: 'Av. España, Centro', lat: 7.7710, lng: -72.2270 }
+  },
+  {
     id: 'ORD-3902', farmacia: 'Farmatodo', farmaciaId: 'FARM-001', clienteId: 'CLI-001',
     estado: 'Preparado', dron: '—',
     fecha: '07/06/2026 10:00',

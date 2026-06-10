@@ -104,6 +104,7 @@ function MapController({ position }) {
   const map = useMap()
 
   useEffect(() => {
+    setTimeout(() => map.invalidateSize(), 100)
     map.setMaxBounds(BOUNDS)
     map.flyTo(position, 17, { duration: 0.8 })
     map.on('drag', () => {
@@ -153,19 +154,19 @@ export default function LocationPicker({ onConfirm, onBack }) {
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-white animate-fade-in">
-      <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white/90 backdrop-blur-xl">
-        <div className="flex items-center gap-3">
-          <button onClick={onBack} className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+      <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 bg-white/90 backdrop-blur-xl">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <button onClick={onBack} className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-colors flex-shrink-0">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           </button>
-          <div>
-            <h3 className="text-base font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Entrega en Capacho</h3>
-            <p className="text-xs text-gray-500">Arrastra el pin hasta tu direccion exacta</p>
+          <div className="min-w-0">
+            <h3 className="text-sm sm:text-base font-bold text-gray-900 font-['Plus_Jakarta_Sans'] truncate">Entrega en Capacho</h3>
+            <p className="text-[10px] sm:text-xs text-gray-500 truncate">Arrastra el pin hasta tu direccion exacta</p>
           </div>
         </div>
       </div>
 
-      <div className="flex-shrink-0 px-6 py-3 bg-gray-50 border-b border-gray-100">
+      <div className="flex-shrink-0 px-3 sm:px-6 py-2 sm:py-3 bg-gray-50 border-b border-gray-100">
         <SearchControl onSelect={handleSearchSelect} />
       </div>
 
@@ -184,8 +185,8 @@ export default function LocationPicker({ onConfirm, onBack }) {
           <ZoomControl />
         </MapContainer>
 
-        <div className="absolute bottom-6 left-4 right-4 z-[1000]">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-gray-100 p-4">
+        <div className="absolute bottom-3 sm:bottom-6 left-2 sm:left-4 right-2 sm:right-4 z-[1000]">
+          <div className="bg-white/95 backdrop-blur-md rounded-xl sm:rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-gray-100 p-3 sm:p-4">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0 mt-0.5 border border-red-100">
                 <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

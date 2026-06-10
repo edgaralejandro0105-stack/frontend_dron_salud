@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import logo from '../assets/Dron_Salud.png'
+import logo from '../../assets/Dron_Salud.png'
 
 function InputField({ label, type = 'text', placeholder = '', icon = null, value, onChange, name }) {
   return (
@@ -42,7 +42,7 @@ function SubmitButton({ children, loading = false }) {
   )
 }
 
-export default function RegisterFormView({ onBackToLogin }) {
+export default function RegisterPage({ onBackToLogin }) {
   const [formData, setFormData] = useState({
     nombre: '',
     apellido: '',

@@ -5,7 +5,7 @@ function formatCurrency(n) {
   return '$' + n.toLocaleString()
 }
 
-export default function PharmacyDashboard({ user }) {
+export default function PharmacyDashboardPage({ user }) {
   const farmaciaId = user?.farmaciaId || 'FARM-001'
   const fileRef = useRef(null)
 
