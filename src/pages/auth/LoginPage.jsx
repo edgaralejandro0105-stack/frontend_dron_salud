@@ -75,9 +75,15 @@ export default function LoginPage({ onCreateAccount, onLoginSuccess }) {
       return
     }
 
-    const matchedUser = users.find(
+    const savedCreds = JSON.parse(localStorage.getItem('dronSalud_credentials') || '{}')
+
+    let matchedUser = users.find(
       (u) => u.email === email.trim() && u.password === password,
     )
+
+    if (!matchedUser && savedCreds[email.trim()] === password) {
+      matchedUser = users.find(u => u.email === email.trim()) || { email: email.trim(), role: 'admin', nombre: 'Usuario', rol: 'Usuario' }
+    }
 
     if (!matchedUser) {
       setError('Correo o contraseña incorrectos.')

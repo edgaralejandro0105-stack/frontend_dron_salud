@@ -22,6 +22,7 @@ function App() {
             setView('login')
             setCurrentUser(null)
           }}
+          onUpdateUser={(updated) => setCurrentUser(updated)}
         />
       )
     }
@@ -38,6 +39,7 @@ function App() {
           setView('login')
           setCurrentUser(null)
         }}
+        onUpdateUser={(updated) => setCurrentUser(updated)}
       />
     )
   }

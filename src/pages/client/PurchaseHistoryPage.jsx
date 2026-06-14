@@ -7,9 +7,10 @@ function formatCurrency(n) {
 
 export default function PurchaseHistoryPage({ user }) {
   const [selected, setSelected] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
-  const purchases = useMemo(() =>
-    ordersData
+  const purchases = useMemo(() => {
+    let items = ordersData
       .filter(o => o.clienteId === user?.id)
       .sort((a, b) => {
         const [da, ta] = a.fecha.split(' ')
@@ -19,123 +20,180 @@ export default function PurchaseHistoryPage({ user }) {
         const dateA = new Date(`${y1}-${m1}-${d1}T${ta}`)
         const dateB = new Date(`${y2}-${m2}-${d2}T${tb}`)
         return dateB - dateA
-      }),
-    [user?.id]
-  )
+      })
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      items = items.filter(o =>
+        o.id.toLowerCase().includes(q) ||
+        o.farmacia.toLowerCase().includes(q)
+      )
+    }
+
+    return items
+  }, [user?.id, searchQuery])
 
   const order = selected ? ordersData.find(o => o.id === selected) : null
   const profile = order ? pharmacyProfiles.find(p => p.id === order.farmaciaId) : null
 
+  const totalPurchases = ordersData.filter(o => o.clienteId === user?.id).length
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
         <div>
-          <h2 className="text-xl font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Mis Compras</h2>
-          <p className="text-sm text-gray-500 mt-1">Tus pedidos realizados</p>
+          <h1 className="text-2xl font-bold text-slate-900 font-['Plus_Jakarta_Sans']">Mis Compras</h1>
+          <p className="text-sm text-slate-500 mt-1">{totalPurchases} pedido{totalPurchases !== 1 ? 's' : ''} realizados</p>
+        </div>
+        <div className="relative w-full sm:w-72">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Buscar por orden o farmacia..."
+            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white transition-all duration-200 text-sm"
+          />
         </div>
       </div>
 
       {purchases.length === 0 ? (
-        <div className="text-center py-16 text-gray-400 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100">
-          <span className="text-5xl block mb-4">&#128203;</span>
-          <p className="text-sm font-semibold">No tienes compras aun</p>
-          <p className="text-xs mt-1">Los pedidos que realices apareceran aqui</p>
+        <div className="text-center py-20 text-slate-400 max-w-md mx-auto">
+          <svg className="w-16 h-16 mx-auto mb-4 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <p className="text-sm font-semibold">
+            {searchQuery ? 'No se encontraron pedidos' : 'No tienes compras aún'}
+          </p>
+          <p className="text-xs mt-1">
+            {searchQuery ? 'Intenta con otro término de búsqueda' : 'Los pedidos que realices aparecerán aquí'}
+          </p>
         </div>
       ) : (
-        <div className="grid gap-5 grid-cols-1 xl:grid-cols-[1fr_1fr]">
-          <div className="card-hover bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 p-6">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-xs font-semibold text-gray-500 uppercase tracking-widest border-b border-gray-100">
-                    <th className="text-left pb-3 pr-4">Orden</th>
-                    <th className="text-left pb-3 pr-4">Fecha</th>
-                    <th className="text-left pb-3 pr-4">Farmacia</th>
-                    <th className="text-left pb-3">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {purchases.map((o, i) => {
-                    const p = pharmacyProfiles.find(ph => ph.id === o.farmaciaId)
-                    return (
-                      <tr
-                        key={o.id}
-                        onClick={() => setSelected(selected === o.id ? null : o.id)}
-                        className={`border-b border-gray-50 transition-colors cursor-pointer animate-fade-in ${
-                          selected === o.id ? 'bg-blue-50' : 'hover:bg-blue-50'
-                        }`}
-                        style={{ animationDelay: `${i * 30}ms` }}
-                      >
-                        <td className="py-3 pr-4 text-blue-600 font-semibold whitespace-nowrap">{o.id}</td>
-                        <td className="py-3 pr-4 text-gray-500 text-xs whitespace-nowrap">{o.fecha}</td>
-                        <td className="py-3 pr-4 text-gray-800 font-medium">{p?.nombre || o.farmacia}</td>
-                        <td className="py-3 text-gray-800 font-semibold whitespace-nowrap">{formatCurrency(o.total)}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+        <div className="grid gap-5 xl:grid-cols-[1fr_1.2fr]">
+          <div className="space-y-3">
+            {purchases.map((o, i) => {
+              const p = pharmacyProfiles.find(ph => ph.id === o.farmaciaId)
+              const isSelected = selected === o.id
+              return (
+                <button
+                  key={o.id}
+                  onClick={() => setSelected(isSelected ? null : o.id)}
+                  className={`w-full text-left bg-white rounded-2xl border p-4 transition-all duration-200 animate-fade-in ${
+                    isSelected
+                      ? 'border-sky-200 shadow-[0_4px_20px_rgba(14,165,233,0.1)]'
+                      : 'border-slate-100 hover:border-sky-100 hover:shadow-sm'
+                  }`}
+                  style={{ animationDelay: `${i * 30}ms` }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-white shrink-0 ${
+                      isSelected ? 'bg-gradient-to-br from-sky-500 to-blue-600' : 'bg-slate-200 text-slate-500'
+                    }`}>
+                      {p?.nombre?.charAt(0) || 'F'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-bold text-slate-800 truncate">{p?.nombre || o.farmacia}</span>
+                        <span className="text-xs font-semibold text-blue-600 shrink-0">{o.id}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 mt-0.5">
+                        <span className="text-xs text-slate-500">{o.fecha}</span>
+                        <span className="text-sm font-bold text-slate-800">{formatCurrency(o.total)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
           </div>
 
-          <div className="card-hover bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 p-6">
+          <div className="bg-white rounded-3xl border border-slate-100 p-6 lg:sticky lg:top-6 h-fit">
             {order ? (
               <div className="space-y-6">
-                <div>
-                  <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">Detalle {order.id}</h3>
-                  <p className="text-[10px] text-gray-400 mt-0.5">{order.fecha}</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 font-['Plus_Jakarta_Sans']">Detalle {order.id}</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">{order.fecha}</p>
+                  </div>
+                  <span className={`text-[10px] font-bold px-3 py-1.5 rounded-lg ${
+                    order.estado === 'Entregado' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                  }`}>
+                    {order.estado}
+                  </span>
                 </div>
 
                 {profile && (
-                  <div className="bg-gradient-to-br from-sky-50 to-blue-50 rounded-2xl p-4 border border-blue-200">
+                  <div className="bg-gradient-to-br from-sky-50 to-blue-50 rounded-2xl p-4 border border-sky-100">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-md">
+                      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-md">
                         {profile.nombre.charAt(0)}
                       </div>
                       <div>
-                        <div className="text-sm font-bold text-gray-800">{profile.nombre}</div>
-                        <div className="text-xs text-gray-500">{profile.direccion}</div>
+                        <div className="text-sm font-bold text-slate-800">{profile.nombre}</div>
+                        <div className="text-xs text-slate-500">{profile.direccion}</div>
                       </div>
                     </div>
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Productos</div>
-                  {order.productos.map((p, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm bg-gray-50 rounded-xl p-3">
-                      <div>
-                        <div className="font-semibold text-gray-800">{p.nombre}</div>
-                        <div className="text-xs text-gray-500">&times; {p.cantidad}</div>
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Productos</span>
+                  </div>
+                  <div className="space-y-2">
+                    {order.productos.map((p, i) => (
+                      <div key={i} className="flex items-center justify-between text-sm bg-slate-50 rounded-xl p-3">
+                        <div>
+                          <div className="font-semibold text-slate-800">{p.nombre}</div>
+                          <div className="text-xs text-slate-500">× {p.cantidad}</div>
+                        </div>
+                        <div className="font-semibold text-slate-800">{formatCurrency(p.precio * p.cantidad)}</div>
                       </div>
-                      <div className="font-semibold text-gray-800">{formatCurrency(p.precio * p.cantidad)}</div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
 
-                <div className="border-t border-gray-100 pt-4 space-y-1.5 text-sm">
-                  <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{formatCurrency(order.subtotal)}</span></div>
-                  <div className="flex justify-between text-gray-600"><span>Envio</span><span>{formatCurrency(order.cargo_dron)}</span></div>
-                  <div className="flex justify-between text-gray-600"><span>IVA</span><span>{formatCurrency(order.iva)}</span></div>
-                  <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-100">
-                    <span className="text-gray-900">Total</span>
+                <div className="bg-slate-50 rounded-2xl p-4 space-y-1.5 text-sm">
+                  <div className="flex justify-between text-slate-600"><span>Subtotal</span><span>{formatCurrency(order.subtotal)}</span></div>
+                  <div className="flex justify-between text-slate-600"><span>Envío (dron)</span><span>{formatCurrency(order.cargo_dron)}</span></div>
+                  <div className="flex justify-between text-slate-600"><span>IVA 16%</span><span>{formatCurrency(order.iva)}</span></div>
+                  <div className="flex justify-between text-base font-bold pt-2 border-t border-slate-200">
+                    <span className="text-slate-900">Total</span>
                     <span className="bg-gradient-to-r from-sky-700 to-blue-700 bg-clip-text text-transparent">{formatCurrency(order.total)}</span>
                   </div>
                 </div>
 
                 {order.destino && (
-                  <div className="bg-gray-50 rounded-2xl p-4">
-                    <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-2">Destino de entrega</div>
-                    <div className="text-sm font-semibold text-gray-800">{order.destino.nombre}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{order.destino.direccion}</div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Destino</span>
+                    </div>
+                    <div className="bg-slate-50 rounded-2xl p-4">
+                      <div className="text-sm font-semibold text-slate-800">{order.destino.nombre}</div>
+                      <div className="text-xs text-slate-500 mt-0.5">{order.destino.direccion}</div>
+                    </div>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-gray-400">
-                <span className="text-4xl mb-3">&#128203;</span>
+              <div className="flex flex-col items-center justify-center min-h-[300px] text-slate-400">
+                <svg className="w-14 h-14 mb-4 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
                 <p className="text-sm font-semibold">Selecciona una compra</p>
-                <p className="text-xs">Haz clic en una orden para ver detalles</p>
+                <p className="text-xs mt-1">Haz clic en un pedido para ver los detalles</p>
               </div>
             )}
           </div>

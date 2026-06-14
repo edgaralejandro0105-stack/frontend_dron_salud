@@ -7,23 +7,24 @@ function formatCurrency(n) {
 
 export default function PharmacyDashboardPage({ user }) {
   const farmaciaId = user?.farmaciaId || 'FARM-001'
-  const fileRef = useRef(null)
-
-  const [profilePic, setProfilePic] = useState(null)
+  const [logo, setLogo] = useState(null)
+  const [fotoFachada, setFotoFachada] = useState(null)
 
   useEffect(() => {
-    const saved = localStorage.getItem('pharmacy_pic_' + farmaciaId)
-    if (saved) setProfilePic(saved)
+    const logoSaved = localStorage.getItem('pharmacy_logo_' + farmaciaId)
+    if (logoSaved) setLogo(JSON.parse(logoSaved))
+    const fachadaSaved = localStorage.getItem('pharmacy_fotoFachada_' + farmaciaId)
+    if (fachadaSaved) setFotoFachada(JSON.parse(fachadaSaved))
   }, [farmaciaId])
 
-  function handleFile(e) {
+  function handleUpload(e, setter, storageKey) {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
     reader.onload = (ev) => {
       const dataUrl = ev.target.result
-      setProfilePic(dataUrl)
-      localStorage.setItem('pharmacy_pic_' + farmaciaId, dataUrl)
+      setter(dataUrl)
+      localStorage.setItem(storageKey, JSON.stringify(dataUrl))
     }
     reader.readAsDataURL(file)
   }
@@ -140,25 +141,39 @@ export default function PharmacyDashboardPage({ user }) {
           {profile ? (
             <div className="space-y-4">
               <div className="flex flex-col items-center">
-                <div
-                  onClick={() => fileRef.current?.click()}
-                  className="relative w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-2xl font-bold shadow-md cursor-pointer overflow-hidden group ring-2 ring-emerald-200 hover:ring-emerald-400 transition-all duration-200"
-                >
-                  {profilePic ? (
-                    <img src={profilePic} alt={profile.nombre} className="w-full h-full object-cover" />
-                  ) : (
-                    profile.nombre.charAt(0)
-                  )}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 flex items-center justify-center">
-                    <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
+                <label className="relative cursor-pointer group">
+                  <div className="w-28 h-28 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-4xl shadow-lg shadow-blue-500/20 mb-3 overflow-hidden transition-all group-hover:shadow-xl group-hover:shadow-blue-500/30">
+                    {logo ? (
+                      <img src={logo} alt={profile.nombre} className="w-full h-full object-contain" />
+                    ) : (
+                      profile.nombre.charAt(0)
+                    )}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 flex items-center justify-center">
+                      <svg className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </div>
                   </div>
-                </div>
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
-                <div className="text-sm font-bold text-gray-800 mt-3">{profile.nombre}</div>
+                  <input type="file" accept="image/*" className="hidden" onChange={e => handleUpload(e, setLogo, 'pharmacy_logo_' + farmaciaId)} />
+                </label>
+                <div className="text-lg font-bold text-gray-800">{profile.nombre}</div>
+                <div className="text-xs text-gray-500">{profile.ciudad}</div>
               </div>
+
+              {fotoFachada && (
+                <div>
+                  <img src={fotoFachada} alt="Fachada" className="w-full h-24 object-cover rounded-xl border border-gray-200" />
+                </div>
+              )}
+              <label className="flex items-center justify-center gap-2 cursor-pointer text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                {fotoFachada ? 'Cambiar foto de fachada' : 'Agregar foto de fachada'}
+                <input type="file" accept="image/*" className="hidden" onChange={e => handleUpload(e, setFotoFachada, 'pharmacy_fotoFachada_' + farmaciaId)} />
+              </label>
+
               <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-2">Informacion</div>
               <div className="space-y-2.5 text-sm">
                 <div className="flex justify-between"><span className="text-gray-500">Direccion</span><span className="text-gray-800 text-right max-w-[180px]">{profile.direccion}</span></div>

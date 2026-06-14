@@ -1,7 +1,7 @@
 export default function SupportButton() {
   return (
     <a
-      href="https://wa.me/584241234567"
+      href="https://wa.me/584247004492"
       target="_blank"
       rel="noopener noreferrer"
       className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold px-5 py-3 rounded-full shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all duration-200 active:scale-95 animate-fade-in-up"

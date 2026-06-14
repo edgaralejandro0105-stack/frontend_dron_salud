@@ -1,13 +1,42 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { ordersData, pharmacyProfiles, users } from '../../data/adminData'
 import Badge from '../../components/ui/Badge'
 import logo from '../../assets/Dron_Salud.png'
+
+const ORDER_STORAGE_KEY = 'dronSalud_orders'
+
+function loadMergedOrders() {
+  try {
+    const saved = localStorage.getItem(ORDER_STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      const merged = [...ordersData]
+      for (const dyn of parsed) {
+        const idx = merged.findIndex((o) => o.id === dyn.id)
+        if (idx >= 0) {
+          if (dyn.estado === 'Pendiente' || dyn.estado === 'Pagado') {
+            merged[idx] = dyn
+          }
+        } else {
+          merged.push(dyn)
+        }
+      }
+      return merged
+    }
+  } catch { /* ignore */ }
+  return [...ordersData]
+}
+
+function persistOrders(orders) {
+  localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(orders))
+}
 
 function formatCurrency(n) {
   return '$' + n.toLocaleString()
 }
 
 function PharmacyInstructions({ order, client, profile, onClose }) {
+  const [comprobanteEnviado, setComprobanteEnviado] = useState(false)
   return (
     <div className="fixed inset-0 z-[70] flex flex-col items-center justify-start bg-gradient-to-br from-emerald-800 via-teal-900 to-green-900 overflow-y-auto" style={{ backgroundSize: '200% 200%' }}>
       <div className="w-full max-w-lg mx-auto text-center animate-fade-in py-6 sm:py-8 px-4">
@@ -82,6 +111,13 @@ function PharmacyInstructions({ order, client, profile, onClose }) {
         )}
 
         <button
+          onClick={() => { alert('Comprobante enviado al cliente exitosamente'); setComprobanteEnviado(true) }}
+          className={`w-full ${comprobanteEnviado ? 'bg-emerald-500/30 text-emerald-300 cursor-default' : 'bg-white/20 hover:bg-white/30 text-white'} font-bold py-2.5 sm:py-3 px-6 sm:px-8 rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/20 active:scale-[0.97] text-sm sm:text-base mb-3`}
+        >
+          {comprobanteEnviado ? '✓ Comprobante enviado' : 'Enviar comprobante al cliente'}
+        </button>
+
+        <button
           onClick={onClose}
           className="bg-white/20 hover:bg-white/30 text-white font-bold py-2.5 sm:py-3 px-6 sm:px-8 rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/20 active:scale-[0.97] text-sm sm:text-base"
         >
@@ -119,9 +155,33 @@ function ConfirmModal({ message, onConfirm, onCancel }) {
 export default function OrdersReceivedPage({ user }) {
   const farmaciaId = user?.farmaciaId || 'FARM-001'
   const [selected, setSelected] = useState(null)
-  const [localOrders, setLocalOrders] = useState(ordersData)
+  const [localOrders, setLocalOrders] = useState(() => loadMergedOrders())
   const [showInstructions, setShowInstructions] = useState(null)
   const [confirmReady, setConfirmReady] = useState(null)
+  const [confirmPayment, setConfirmPayment] = useState(null)
+  const [readOrders, setReadOrders] = useState(() => new Set())
+  const [newOrderAlert, setNewOrderAlert] = useState(false)
+
+  useEffect(() => {
+    persistOrders(localOrders)
+  }, [localOrders])
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      try {
+        const saved = localStorage.getItem(ORDER_STORAGE_KEY)
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          const currentPendienteIds = new Set(localOrders.filter(o => o.estado === 'Pendiente').map(o => o.id))
+          const hasNewPendiente = parsed.some(o => o.estado === 'Pendiente' && !currentPendienteIds.has(o.id))
+          if (hasNewPendiente) {
+            setNewOrderAlert(true)
+          }
+        }
+      } catch { /* ignore */ }
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [localOrders])
 
   const pharmacyOrders = useMemo(
     () => localOrders.filter((o) => o.farmaciaId === farmaciaId),
@@ -150,13 +210,28 @@ export default function OrdersReceivedPage({ user }) {
     setShowInstructions(id)
   }
 
+  function handleConfirmPayment(id) {
+    setLocalOrders((prev) =>
+      prev.map((o) =>
+        o.id === id ? { ...o, estado: 'Pagado' } : o
+      )
+    )
+    setConfirmPayment(null)
+    setSelected(id)
+  }
+
   const sortedOrders = useMemo(
     () => [...pharmacyOrders].sort((a, b) => {
-      const orderPriorities = { 'Preparando': 0, 'Preparado': 1, 'En tránsito': 2, 'Entregado': 3 }
+      const orderPriorities = { 'Preparando': -1, 'Pendiente': 0, 'Pagado': 1, 'Preparado': 2, 'En tránsito': 3, 'Entregado': 4 }
       return (orderPriorities[a.estado] ?? 9) - (orderPriorities[b.estado] ?? 9)
     }),
     [pharmacyOrders]
   )
+
+  function handleSelectOrder(id) {
+    setSelected(selected === id ? null : id)
+    setReadOrders(prev => { const next = new Set(prev); next.add(id); return next })
+  }
 
   return (
     <div>
@@ -168,9 +243,26 @@ export default function OrdersReceivedPage({ user }) {
           </p>
         </div>
         <span className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white text-xs font-bold rounded-full px-4 py-1.5 shadow-md">
-          {pharmacyOrders.filter((o) => o.estado === 'Preparando' || o.estado === 'Preparado').length} activas
+          {pharmacyOrders.filter((o) => o.estado === 'Pendiente' || o.estado === 'Pagado' || o.estado === 'Preparado').length} activas
         </span>
       </div>
+
+      {newOrderAlert && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3.5 mb-6 flex items-center justify-between shadow-sm animate-fade-in">
+          <div className="flex items-center gap-2 text-sm text-amber-800">
+            <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            <span className="font-semibold">¡Nuevo pedido recibido!</span>
+          </div>
+          <button
+            onClick={() => { setNewOrderAlert(false); setLocalOrders(loadMergedOrders()) }}
+            className="text-xs font-bold bg-amber-200 hover:bg-amber-300 text-amber-800 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            Ver
+          </button>
+        </div>
+      )}
 
       <div className="grid gap-5 grid-cols-1 xl:grid-cols-[1fr_1fr]">
         <div className="card-hover bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 p-6">
@@ -198,9 +290,13 @@ export default function OrdersReceivedPage({ user }) {
                     return (
                       <tr
                         key={o.id}
-                        onClick={() => setSelected(selected === o.id ? null : o.id)}
+                        onClick={() => handleSelectOrder(o.id)}
                         className={`border-b border-gray-50 transition-colors cursor-pointer animate-fade-in ${
-                          selected === o.id ? 'bg-emerald-50' : 'hover:bg-emerald-50'
+                          selected === o.id ? 'bg-emerald-50' : ''
+                        } ${
+                          o.estado === 'Preparando' && !readOrders.has(o.id)
+                            ? 'bg-gray-100 hover:bg-gray-200 font-semibold'
+                            : 'hover:bg-emerald-50'
                         }`}
                         style={{ animationDelay: `${i * 30}ms` }}
                       >
@@ -244,6 +340,11 @@ export default function OrdersReceivedPage({ user }) {
                 </div>
               )}
 
+              <div className="bg-gray-50 rounded-2xl p-4">
+                <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1">Referencia de pago</div>
+                <div className="text-sm font-bold text-gray-800 font-mono">{order.referencia || '—'}</div>
+              </div>
+
               <div>
                 <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-3">Productos</div>
                 <div className="space-y-2">
@@ -285,9 +386,49 @@ export default function OrdersReceivedPage({ user }) {
                 </div>
               )}
 
-              {(order.estado === 'Preparando' || order.estado === 'Preparado') && (
+              {order.estado === 'Preparando' && (
+                <div className="pt-2 space-y-3">
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+                    <svg className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                    <div className="text-sm text-blue-800">
+                      <p className="font-semibold">Revisa el pago y los productos</p>
+                      <p className="mt-1.5 font-mono font-bold text-base">Ref: {order.referencia || '—'}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setConfirmReady(order.id)}
+                    className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold py-3.5 rounded-xl transition-all duration-200 shadow-lg shadow-emerald-500/25 hover:shadow-xl active:scale-[0.97]"
+                  >
+                    Listo para recolección
+                  </button>
+                </div>
+              )}
+
+              {order.estado === 'Pendiente' && (
+                <div className="pt-2 space-y-3">
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+                    <svg className="w-5 h-5 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    <div className="text-[11px] text-amber-800">
+                      <p>El cliente ha enviado el comprobante de pago. Verifica que hayas recibido la transferencia para confirmar.</p>
+                      <p className="mt-1.5 font-mono font-bold">Ref: {order.referencia || '—'}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setConfirmPayment(order.id)}
+                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-3.5 rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/25 hover:shadow-xl active:scale-[0.97]"
+                  >
+                    Confirmar Pago Recibido
+                  </button>
+                </div>
+              )}
+
+              {(order.estado === 'Pagado' || order.estado === 'Preparado') && (
                 <div className="pt-2">
-                  {order.estado === 'Preparando' && (
+                  {order.estado === 'Pagado' && (
                     <button
                       onClick={() => setConfirmReady(order.id)}
                       className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold py-3.5 rounded-xl transition-all duration-200 shadow-lg shadow-emerald-500/25 hover:shadow-xl active:scale-[0.97]"
@@ -319,6 +460,14 @@ export default function OrdersReceivedPage({ user }) {
           )}
         </div>
       </div>
+
+      {confirmPayment && (
+        <ConfirmModal
+          message="¿Confirmas que has recibido la transferencia del cliente?"
+          onConfirm={() => handleConfirmPayment(confirmPayment)}
+          onCancel={() => setConfirmPayment(null)}
+        />
+      )}
 
       {confirmReady && (
         <ConfirmModal
