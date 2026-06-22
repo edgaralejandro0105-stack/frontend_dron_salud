@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { users } from '../../data/adminData'
+import { login } from '../../api'
 import logo from '../../assets/Dron_Salud.png'
 import SupportButton from '../../components/ui/SupportButton'
 import DroneDelivery from '../../components/ui/DroneDelivery'
@@ -75,28 +75,24 @@ export default function LoginPage({ onCreateAccount, onLoginSuccess }) {
       return
     }
 
-    const savedCreds = JSON.parse(localStorage.getItem('dronSalud_credentials') || '{}')
-
-    let matchedUser = users.find(
-      (u) => u.email === email.trim() && u.password === password,
-    )
-
-    if (!matchedUser && savedCreds[email.trim()] === password) {
-      matchedUser = users.find(u => u.email === email.trim()) || { email: email.trim(), role: 'admin', nombre: 'Usuario', rol: 'Usuario' }
-    }
-
-    if (!matchedUser) {
-      setError('Correo o contraseña incorrectos.')
-      return
-    }
-
     setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      if (onLoginSuccess) {
-        onLoginSuccess(matchedUser)
+    try {
+      const data = await login(email.trim(), password)
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('user', JSON.stringify(data.usuario))
+      const user = {
+        ...data.usuario,
+        role: data.usuario.tipo_usuario,
+        nombre: data.usuario.nombre + ' ' + (data.usuario.apellido || ''),
       }
-    }, 800)
+      setTimeout(() => {
+        setLoading(false)
+        if (onLoginSuccess) onLoginSuccess(user)
+      }, 500)
+    } catch (err) {
+      setLoading(false)
+      setError(err.response?.data?.message || err.response?.data?.error || 'Correo o contraseña incorrectos.')
+    }
   }
 
   const handleForgotPassword = (e) => {

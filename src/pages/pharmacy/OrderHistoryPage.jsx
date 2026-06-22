@@ -1,26 +1,33 @@
-import { useState, useMemo } from 'react'
-import { ordersData, users } from '../../data/adminData'
+import { useState, useMemo, useEffect } from 'react'
+import { getPedidos } from '../../api'
 
 function formatCurrency(n) {
-  return '$' + n.toLocaleString()
+  const num = Number(n)
+  if (isNaN(num)) return 'Bs. 0,00'
+  return 'Bs. ' + num.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 export default function OrderHistoryPage({ user }) {
-  const farmaciaId = user?.farmaciaId || 'FARM-001'
+  const [pedidos, setPedidos] = useState([])
   const [selected, setSelected] = useState(null)
 
-  const pharmacyOrders = useMemo(
-    () => ordersData.filter((o) => o.farmaciaId === farmaciaId),
-    [farmaciaId]
-  )
+  const farmaciaId = user?.id_farmacia
+
+  useEffect(() => {
+    if (!farmaciaId) return
+    getPedidos({ id_farmacia: farmaciaId })
+      .then(data => {
+        if (Array.isArray(data)) setPedidos(data)
+        else if (data?.pedidos) setPedidos(data.pedidos)
+      })
+      .catch(() => {})
+  }, [farmaciaId])
 
   const order = selected
-    ? pharmacyOrders.find((o) => o.id === selected)
+    ? pedidos.find(o => o.id_pedido === selected)
     : null
 
-  const client = order
-    ? users.find((u) => u.id === order.clienteId)
-    : null
+  const client = null
 
   return (
     <div>
@@ -28,7 +35,7 @@ export default function OrderHistoryPage({ user }) {
         <div>
           <h2 className="text-xl font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Historial de Pedidos</h2>
           <p className="text-sm text-gray-500 mt-1">
-            {pharmacyOrders.length} pedido{pharmacyOrders.length !== 1 ? 's' : ''} en total
+            {pedidos.length} pedido{pedidos.length !== 1 ? 's' : ''} en total
           </p>
         </div>
       </div>
@@ -40,38 +47,33 @@ export default function OrderHistoryPage({ user }) {
               <thead>
                 <tr className="text-xs font-semibold text-gray-500 uppercase tracking-widest border-b border-gray-100">
                   <th className="text-left pb-3 pr-4">Orden</th>
-                  <th className="text-left pb-3 pr-4">Cliente</th>
                   <th className="text-left pb-3 pr-4">Items</th>
                   <th className="text-left pb-3 pr-4">Total</th>
                   <th className="text-left pb-3">Fecha</th>
                 </tr>
               </thead>
               <tbody>
-                {pharmacyOrders.length === 0 ? (
+                {pedidos.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="py-12 text-center text-gray-400 text-sm">
-                      No hay pedidos con este estado
+                    <td colSpan="4" className="py-12 text-center text-gray-400 text-sm">
+                      No hay pedidos
                     </td>
                   </tr>
                 ) : (
-                  pharmacyOrders.map((o, i) => {
-                    const c = users.find((u) => u.id === o.clienteId)
-                    return (
-                      <tr
-                        key={o.id}
-                        onClick={() => setSelected(selected === o.id ? null : o.id)}
-                        className={`border-b border-gray-50 transition-colors cursor-pointer ${
-                          selected === o.id ? 'bg-gray-100' : 'hover:bg-gray-50'
-                        }`}
-                      >
-                        <td className="py-3 pr-4 text-gray-800 font-semibold whitespace-nowrap">{o.id}</td>
-                        <td className="py-3 pr-4 text-gray-800 font-medium">{c?.nombre || 'Cliente'}</td>
-                        <td className="py-3 pr-4 text-gray-600">{o.productos.length}</td>
-                        <td className="py-3 pr-4 text-gray-800 font-semibold whitespace-nowrap">{formatCurrency(o.total)}</td>
-                        <td className="py-3 text-gray-500 text-xs whitespace-nowrap">{o.fecha}</td>
-                      </tr>
-                    )
-                  })
+                  pedidos.map((o, i) => (
+                    <tr
+                      key={o.id_pedido}
+                      onClick={() => setSelected(selected === o.id_pedido ? null : o.id_pedido)}
+                      className={`border-b border-gray-50 transition-colors cursor-pointer ${
+                        selected === o.id_pedido ? 'bg-gray-100' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <td className="py-3 pr-4 text-gray-800 font-semibold whitespace-nowrap">#{o.id_pedido}</td>
+                      <td className="py-3 pr-4 text-gray-600">{(o.detalles || []).length}</td>
+                      <td className="py-3 pr-4 text-gray-800 font-semibold whitespace-nowrap">{formatCurrency(o.total)}</td>
+                      <td className="py-3 text-gray-500 text-xs whitespace-nowrap">{o.fecha_creacion ? new Date(o.fecha_creacion).toLocaleDateString('es-ES') : ''}</td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -82,41 +84,27 @@ export default function OrderHistoryPage({ user }) {
           {order ? (
             <div className="space-y-6">
               <div>
-                <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">{order.id}</h3>
-                <p className="text-[10px] text-gray-400 mt-0.5">{order.fecha}</p>
+                <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">#{order.id_pedido}</h3>
+                <p className="text-[10px] text-gray-400 mt-0.5">{order.fecha_creacion ? new Date(order.fecha_creacion).toLocaleDateString('es-ES') : ''}</p>
               </div>
-
-              {client && (
-                <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-2xl p-4 border border-gray-200">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-500 to-slate-600 flex items-center justify-center text-white font-bold shadow-md">
-                      {client.nombre?.charAt(0) || '?'}
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-gray-800">{client.nombre}</div>
-                      <div className="text-xs text-gray-500">{client.telefono}</div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               <div>
                 <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-3">Productos</div>
                 <div className="space-y-2">
-                  {order.productos.map((p, i) => (
+                  {(order.detalles || []).map((p, i) => (
                     <div key={i} className="flex items-center justify-between text-sm bg-gray-50 rounded-xl p-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-xs flex-shrink-0 font-bold text-gray-400">
                           Rx
                         </div>
                         <div>
-                          <div className="font-semibold text-gray-800">{p.nombre}</div>
+                          <div className="font-semibold text-gray-800">{p.nombre_producto}</div>
                           <div className="text-xs text-gray-500">x{p.cantidad}</div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-semibold text-gray-800">{formatCurrency(p.precio * p.cantidad)}</div>
-                        <div className="text-[10px] text-gray-400">{formatCurrency(p.precio)} c/u</div>
+                        <div className="font-semibold text-gray-800">{formatCurrency(Number(p.precio_unitario) * p.cantidad)}</div>
+                        <div className="text-[10px] text-gray-400">{formatCurrency(p.precio_unitario)} c/u</div>
                       </div>
                     </div>
                   ))}
@@ -133,11 +121,11 @@ export default function OrderHistoryPage({ user }) {
                 </div>
               </div>
 
-              {order.destino && (
+              {(order.destino_nombre || order.destino_direccion) && (
                 <div className="bg-gray-50 rounded-2xl p-4">
                   <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-2">Destino de entrega</div>
-                  <div className="text-sm font-semibold text-gray-800">{order.destino.nombre}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">{order.destino.direccion}</div>
+                  <div className="text-sm font-semibold text-gray-800">{order.destino_nombre || 'Dirección'}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{order.destino_direccion}</div>
                 </div>
               )}
 

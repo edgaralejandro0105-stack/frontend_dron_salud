@@ -1,34 +1,37 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import logo from '../assets/Dron_Salud.png'
 import SidebarItem from '../components/ui/SidebarItem'
 import UserProfileCard from '../components/ui/UserProfileCard'
-import DashboardPage from '../pages/admin/DashboardPage'
+import Avatar from '../components/ui/Avatar'
+import AdminDashboard from '../pages/admin/DashboardPage'
+import PharmacyDashboard from '../pages/pharmacy/DashboardPage'
 import InventoryPage from '../pages/pharmacy/InventoryPage'
 import OrdersPage from '../pages/admin/OrdersPage'
 import FleetPage from '../pages/admin/FleetPage'
-import NewOrderPage from '../pages/client/NewOrderPage'
 import DispatchPage from '../pages/operator/DispatchPage'
 import OrdersReceivedPage from '../pages/pharmacy/OrdersReceivedPage'
 import OrderHistoryPage from '../pages/pharmacy/OrderHistoryPage'
-import PharmacyDashboardPage from '../pages/pharmacy/DashboardPage'
 import OperatorHistoryPage from '../pages/operator/HistoryPage'
 import UserManagementPage from '../pages/admin/UserManagementPage'
+import ClientsPage from '../pages/admin/ClientsPage'
 import SupportButton from '../components/ui/SupportButton'
 import PaymentConfigPage from '../pages/pharmacy/PaymentConfigPage'
+import PharmacyProfilePage from '../pages/pharmacy/PharmacyProfilePage'
 
 const moduleMap = {
-  dashboard: DashboardPage,
+  dashboard: null,
   inventory: InventoryPage,
   orders: OrdersPage,
   fleet: FleetPage,
-  shopping: NewOrderPage,
-  operator: DispatchPage,
-  ordersReceived: OrdersReceivedPage,
-  pharmacyHistory: OrderHistoryPage,
-  pharmacyDashboard: PharmacyDashboardPage,
-  operatorHistory: OperatorHistoryPage,
-  adminManagement: UserManagementPage,
-  pharmacyPayment: PaymentConfigPage,
+  'orders-received': OrdersReceivedPage,
+  'order-history': OrderHistoryPage,
+  'payment-config': PaymentConfigPage,
+  dispatch: DispatchPage,
+  'delivery-history': OperatorHistoryPage,
+  users: UserManagementPage,
+  clientes: ClientsPage,
+  'pharmacy-profile': PharmacyProfilePage,
 }
 
 function NotificationBell({ user, onNavigate }) {
@@ -96,19 +99,42 @@ function Clock({ date }) {
   )
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(error) { return { error } }
+  render() {
+    if (this.state.error) return <div className="p-8 text-red-600 bg-red-50 rounded-2xl m-8"><h2 className="font-bold text-lg mb-2">Error al cargar el módulo</h2><p className="text-sm font-mono">{this.state.error.message}</p></div>
+    return this.props.children
+  }
+}
+
 export default function DashboardLayout({ modules, moduleTitles, user, onLogout, onUpdateUser }) {
   const [activeModule, setActiveModule] = useState(modules[0]?.key || 'dashboard')
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [editProfileKey, setEditProfileKey] = useState(0)
   const [clock, setClock] = useState(new Date())
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const profileBtnRef = useRef(null)
 
   useEffect(() => {
     const id = setInterval(() => setClock(new Date()), 1000)
     return () => clearInterval(id)
   }, [])
 
-  const ModuleComponent = moduleMap[activeModule]
+  useEffect(() => {
+    if (!showProfileMenu) return
+    function handleClose() { setShowProfileMenu(false) }
+    window.addEventListener('scroll', handleClose, { once: true })
+    window.addEventListener('resize', handleClose, { once: true })
+    return () => {
+      window.removeEventListener('scroll', handleClose)
+      window.removeEventListener('resize', handleClose)
+    }
+  }, [showProfileMenu])
+
+  const ModuleComponent = activeModule === 'dashboard'
+    ? (user?.role === 'farmacia' ? PharmacyDashboard : AdminDashboard)
+    : moduleMap[activeModule]
 
   function closeSidebar() { setSidebarOpen(false) }
 
@@ -140,12 +166,10 @@ export default function DashboardLayout({ modules, moduleTitles, user, onLogout,
 
         <div className="mt-auto p-5 space-y-3 border-t border-white/5">
           <div className="flex items-center gap-3 rounded-xl px-4 py-3">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-blue-500/20">
-              {user?.nombre?.charAt(0) || 'U'}
-            </div>
+            <Avatar src={user?.foto_url} name={user?.nombre} size="md" />
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold text-white truncate">{user?.nombre || 'Usuario'}</div>
-              <div className="text-[11px] text-blue-200/50 truncate">{user?.rol || ''}</div>
+              <div className="text-[11px] text-blue-200/50 truncate">{user?.role || ''}</div>
             </div>
           </div>
 
@@ -176,63 +200,68 @@ export default function DashboardLayout({ modules, moduleTitles, user, onLogout,
             <Clock date={clock} />
             <div className="relative">
               <button
+                ref={profileBtnRef}
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
                 className="flex items-center gap-2.5 pl-3 pr-2.5 py-2 rounded-xl bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all shadow-sm"
               >
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold">
-                  {user?.nombre?.charAt(0) || 'U'}
-                </div>
+                <Avatar src={user?.foto_url} name={user?.nombre} size="sm" />
                 <span className="text-xs font-semibold text-gray-700 hidden sm:block max-w-[100px] truncate">{user?.nombre || 'Usuario'}</span>
                 <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
 
-              {showProfileMenu && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-[0_12px_40px_rgb(0,0,0,0.15)] border border-gray-100 animate-scale-in overflow-hidden z-50" onMouseLeave={() => setShowProfileMenu(false)}>
-                  <div className="p-5 pb-3 border-b border-gray-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg">
-                        {user?.nombre?.charAt(0) || 'U'}
+              {showProfileMenu && profileBtnRef.current && createPortal(
+                (() => {
+                  const rect = profileBtnRef.current.getBoundingClientRect()
+                  return (
+                    <div style={{ position: 'fixed', top: rect.bottom + 8, right: window.innerWidth - rect.right, zIndex: 9999, width: '18rem' }} className="bg-white rounded-2xl shadow-[0_12px_40px_rgb(0,0,0,0.15)] border border-gray-100 animate-scale-in overflow-hidden" onMouseLeave={() => setShowProfileMenu(false)}>
+                      <div className="p-5 pb-3 border-b border-gray-100">
+                        <div className="flex items-center gap-3">
+                          <Avatar src={user?.foto_url} name={user?.nombre} size="lg" />
+                          <div className="min-w-0">
+                            <div className="text-sm font-bold text-gray-900 truncate">{user?.nombre || 'Usuario'}</div>
+                            <div className="text-xs text-gray-500 truncate">{user?.email || ''}</div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-bold text-gray-900 truncate">{user?.nombre || 'Usuario'}</div>
-                        <div className="text-xs text-gray-500 truncate">{user?.email || ''}</div>
+                      <div className="p-2">
+                        <button
+                          onClick={() => { setShowProfileMenu(false); setEditProfileKey(k => k + 1) }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all text-left"
+                        >
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Editar perfil
+                        </button>
+                        <button
+                          onClick={onLogout}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-red-600 hover:bg-red-50 transition-all text-left"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                          </svg>
+                          Cerrar sesión
+                        </button>
                       </div>
                     </div>
-                  </div>
-                  <div className="p-2">
-                    <button
-                      onClick={() => { setShowProfileMenu(false); setEditProfileKey(k => k + 1) }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all text-left"
-                    >
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                      Editar perfil
-                    </button>
-                    <button
-                      onClick={onLogout}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-red-600 hover:bg-red-50 transition-all text-left"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                      </svg>
-                      Cerrar sesión
-                    </button>
-                  </div>
-                </div>
+                  )
+                })(),
+                document.body
               )}
             </div>
           </div>
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 animate-fade-in">
-          {ModuleComponent ? <ModuleComponent user={user} /> : (
-            <div className="flex items-center justify-center h-full text-gray-400">
-              <span>Módulo no disponible</span>
-            </div>
-          )}
+          <ErrorBoundary>
+            {ModuleComponent ? <ModuleComponent user={user} /> : (
+              <div className="flex items-center justify-center h-full text-gray-400">
+                <span>Módulo no disponible</span>
+              </div>
+            )}
+          </ErrorBoundary>
         </div>
       </main>
       {user?.role === 'farmacia' && <SupportButton />}

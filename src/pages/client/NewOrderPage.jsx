@@ -1,22 +1,24 @@
-import { useState, useMemo } from 'react'
-import { inventoryData, pharmacyProfiles, operatorProfile, ordersData } from '../../data/adminData'
+import { useState, useMemo, useEffect } from 'react'
+import { getFarmacias, getProductos, createPedido, createPago } from '../../api'
 import Badge from '../../components/ui/Badge'
 import LocationPicker from '../../components/maps/LocationPicker'
 import logo from '../../assets/Dron_Salud.png'
 
 function formatCurrency(n) {
-  return '$' + n.toLocaleString()
+  const num = Number(n)
+  if (isNaN(num)) return 'Bs. 0,00'
+  return 'Bs. ' + num.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 const medicineColors = {
-  'MED-001': 'bg-sky-400', 'MED-002': 'bg-sky-400', 'MED-003': 'bg-rose-400',
-  'MED-004': 'bg-sky-400', 'MED-005': 'bg-sky-400', 'MED-006': 'bg-amber-400',
-  'MED-007': 'bg-sky-400', 'MED-008': 'bg-sky-400', 'MED-009': 'bg-emerald-400',
-  'MED-010': 'bg-sky-400',
+  1: 'bg-sky-400', 2: 'bg-sky-400', 3: 'bg-rose-400',
+  4: 'bg-sky-400', 5: 'bg-sky-400', 6: 'bg-amber-400',
+  7: 'bg-sky-400', 8: 'bg-sky-400', 9: 'bg-emerald-400',
+  10: 'bg-sky-400',
 }
 
 function InvoiceModal({ cart, profile, onClose, onPlaceOrder }) {
-  const cartTotal = cart.reduce((sum, item) => sum + item.product.precio * item.qty, 0)
+  const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.precio) * item.qty, 0)
   const cargoDron = 5000
   const iva = Math.round(cartTotal * 0.16)
   const total = cartTotal + cargoDron + iva
@@ -40,13 +42,13 @@ function InvoiceModal({ cart, profile, onClose, onPlaceOrder }) {
           {profile && (
             <div className="flex items-center gap-4 bg-gradient-to-br from-sky-50 to-blue-50 rounded-2xl p-4 border border-sky-100">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-xl shadow-md flex-shrink-0">
-                {profile.nombre.charAt(0)}
-              </div>
-              <div className="min-w-0">
-                <div className="text-base font-bold text-slate-800">{profile.nombre}</div>
-                <div className="text-xs text-slate-500 mt-0.5">{profile.direccion}</div>
-                <div className="text-xs text-slate-400 mt-0.5">{profile.telefono} · {profile.ciudad}</div>
-              </div>
+                  {profile.nombre_comercial.charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-base font-bold text-slate-800">{profile.nombre_comercial}</div>
+                  <div className="text-xs text-slate-500 mt-0.5">{profile.direccion}</div>
+                  <div className="text-xs text-slate-400 mt-0.5">{profile.telefono} · {profile.ciudad}</div>
+                </div>
             </div>
           )}
 
@@ -58,20 +60,20 @@ function InvoiceModal({ cart, profile, onClose, onPlaceOrder }) {
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Productos ({cart.reduce((s, i) => s + i.qty, 0)})</span>
             </div>
             {cart.map((item, i) => (
-              <div key={item.product.id} className="flex items-center gap-4 bg-slate-50 rounded-xl p-3 animate-fade-in-up" style={{ animationDelay: `${i * 50}ms` }}>
+              <div key={item.product.id_producto} className="flex items-center gap-4 bg-slate-50 rounded-xl p-3 animate-fade-in-up" style={{ animationDelay: `${i * 50}ms` }}>
                 <div className="w-12 h-12 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center flex-shrink-0">
-                  {item.product.foto ? (
-                    <img src={item.product.foto} alt="" className="w-full h-full object-cover rounded-xl" />
+                  {item.product.foto_url ? (
+                    <img src={item.product.foto_url} alt="" className="w-full h-full object-cover rounded-xl" />
                   ) : (
-                    <div className={`w-5 h-5 rounded-full ${medicineColors[item.product.id] || 'bg-slate-300'}`} />
+                    <div className={`w-5 h-5 rounded-full ${medicineColors[item.product.id_producto] || 'bg-slate-300'}`} />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-bold text-slate-800">{item.product.nombre} {item.product.concentracion}</div>
-                  <div className="text-xs text-slate-500 mt-0.5">{item.product.unidad} · {item.qty} unidad{item.qty !== 1 ? 'es' : ''}</div>
+                  <div className="text-xs text-slate-500 mt-0.5">{item.product.unidad_medida} · {item.qty} unidad{item.qty !== 1 ? 'es' : ''}</div>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <div className="text-xs text-slate-500">{formatCurrency(item.product.precio * item.qty)}</div>
+                  <div className="text-xs text-slate-500">{formatCurrency(Number(item.product.precio) * item.qty)}</div>
                 </div>
               </div>
             ))}
@@ -199,12 +201,17 @@ function PaymentModal({ cart, profile, user, onSuccess, onBack }) {
   const [mobileCI, setMobileCI] = useState('')
   const [mobileRef, setMobileRef] = useState('')
 
-  const cartTotal = cart.reduce((sum, item) => sum + item.product.precio * item.qty, 0)
+  const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.precio) * item.qty, 0)
   const cargoDron = 5000
   const iva = Math.round(cartTotal * 0.16)
   const total = cartTotal + cargoDron + iva
 
-  const pagoMovil = profile?.pagoMovil
+  const pagoMovil = profile ? {
+    banco: profile.pago_movil_banco,
+    telefono: profile.pago_movil_telefono,
+    ci: profile.pago_movil_ci,
+    titular: profile.pago_movil_titular,
+  } : null
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -310,9 +317,9 @@ function PaymentModal({ cart, profile, user, onSuccess, onBack }) {
           <div className="bg-gradient-to-br from-sky-50 to-blue-50 rounded-2xl p-5 border border-sky-200">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
-                {profile?.nombre?.charAt(0) || 'F'}
+                {profile?.nombre_comercial?.charAt(0) || 'F'}
               </div>
-              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Transferir a {profile?.nombre || 'la farmacia'}</span>
+              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Transferir a {profile?.nombre_comercial || 'la farmacia'}</span>
             </div>
             <div className="space-y-2.5 text-sm">
               <div className="flex items-center justify-between py-1.5 border-b border-sky-100/50">
@@ -393,7 +400,7 @@ function PaymentModal({ cart, profile, user, onSuccess, onBack }) {
 }
 
 function DroneInstructions({ cart, profile, deliveryLocation, operator, user, paymentInfo, onBackToShop }) {
-  const cartTotal = cart.reduce((sum, item) => sum + item.product.precio * item.qty, 0)
+  const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.precio) * item.qty, 0)
   const cargoDron = 5000
   const iva = Math.round(cartTotal * 0.16)
   const granTotal = cartTotal + cargoDron + iva
@@ -522,9 +529,9 @@ function DroneInstructions({ cart, profile, deliveryLocation, operator, user, pa
           </div>
           <div className="space-y-1.5 text-xs">
             {cart.map((item) => (
-              <div key={item.product.id} className="flex justify-between text-sky-100 gap-2">
+              <div key={item.product.id_producto} className="flex justify-between text-sky-100 gap-2">
                 <span className="text-left truncate">{item.product.nombre} {item.product.concentracion} x{item.qty}</span>
-                <span className="font-semibold text-white flex-shrink-0">{formatCurrency(item.product.precio * item.qty)}</span>
+                <span className="font-semibold text-white flex-shrink-0">{formatCurrency(Number(item.product.precio) * item.qty)}</span>
               </div>
             ))}
           </div>
@@ -536,7 +543,7 @@ function DroneInstructions({ cart, profile, deliveryLocation, operator, user, pa
 
         {profile && (
           <div className="text-[10px] text-sky-300 mb-1">
-            Origen: {profile.nombre} · {profile.direccion}
+            Origen: {profile.nombre_comercial} · {profile.direccion}
           </div>
         )}
         {deliveryLocation && (
@@ -558,12 +565,14 @@ function DroneInstructions({ cart, profile, deliveryLocation, operator, user, pa
 
 function ProductCard({ product, inCart, stockOk, onAdd }) {
   const [qty, setQty] = useState(1)
+  const stock = Number(product.stock_actual) || 0
+  const cond = stock > 100 ? 'text-emerald-600' : stock > 20 ? 'text-amber-600' : 'text-red-600'
 
   return (
     <div className="group bg-white rounded-2xl border border-slate-100 p-3 hover:border-sky-200 hover:shadow-[0_8px_30px_rgba(14,165,233,0.1)] transition-all duration-300 flex flex-col">
       <div className="w-full h-32 rounded-xl bg-gradient-to-br from-sky-50 to-blue-50 flex items-center justify-center mb-3 overflow-hidden relative">
-        {product.foto ? (
-          <img src={product.foto} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        {product.foto_url ? (
+          <img src={product.foto_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
         ) : (
           <div className="flex flex-col items-center gap-0.5">
             <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -573,7 +582,9 @@ function ProductCard({ product, inCart, stockOk, onAdd }) {
           </div>
         )}
         <div className="absolute top-1.5 right-1.5">
-          <Badge text={product.estado} />
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${stock > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+            {stock > 0 ? 'Disponible' : 'Sin stock'}
+          </span>
         </div>
       </div>
 
@@ -582,16 +593,16 @@ function ProductCard({ product, inCart, stockOk, onAdd }) {
           {product.nombre} {product.concentracion}
         </h4>
         <div className="flex items-center gap-1.5 mb-1.5">
-          <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">{product.unidad}</span>
-          <span className={`text-[10px] font-semibold ${product.stock > 100 ? 'text-emerald-600' : product.stock > 20 ? 'text-amber-600' : 'text-red-600'}`}>
-            Stock: {product.stock.toLocaleString()}
+          <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">{product.unidad_medida}</span>
+          <span className={`text-[10px] font-semibold ${cond}`}>
+            Stock: {stock.toLocaleString()}
           </span>
         </div>
         <p className="text-[10px] text-slate-500 mb-2 line-clamp-2 leading-relaxed">
           {product.especificaciones}
         </p>
         <div className="text-base font-bold bg-gradient-to-r from-sky-700 to-blue-700 bg-clip-text text-transparent mb-2">
-          {formatCurrency(product.precio)}
+          {formatCurrency(Number(product.precio))}
         </div>
       </div>
 
@@ -645,7 +656,10 @@ function saveLocationToStorage(locations) {
 }
 
 export default function NewOrderPage({ user }) {
+  const [farmacias, setFarmacias] = useState([])
   const [selectedPharmacy, setSelectedPharmacy] = useState(null)
+  const [catalog, setCatalog] = useState([])
+  const [loadingCatalog, setLoadingCatalog] = useState(false)
   const [cart, setCart] = useState([])
   const [showInvoice, setShowInvoice] = useState(false)
   const [showLocationPicker, setShowLocationPicker] = useState(false)
@@ -659,12 +673,21 @@ export default function NewOrderPage({ user }) {
   const [filterCategoria, setFilterCategoria] = useState('todos')
   const [cartOpen, setCartOpen] = useState(false)
 
-  const catalog = useMemo(
-    () => (selectedPharmacy
-      ? inventoryData.filter(p => p.farmaciaId === selectedPharmacy.id)
-      : []),
-    [selectedPharmacy]
-  )
+  useEffect(() => {
+    getFarmacias().then(setFarmacias).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (selectedPharmacy) {
+      setLoadingCatalog(true)
+      getProductos({ id_farmacia: selectedPharmacy.id_farmacia })
+        .then(setCatalog)
+        .catch(() => setCatalog([]))
+        .finally(() => setLoadingCatalog(false))
+    } else {
+      setCatalog([])
+    }
+  }, [selectedPharmacy])
 
   const categorias = useMemo(() => {
     const cats = new Set(catalog.map(p => p.categoria).filter(Boolean))
@@ -688,20 +711,20 @@ export default function NewOrderPage({ user }) {
   }, [catalog, searchQuery, filterCategoria])
 
   const profile = selectedPharmacy
-    ? pharmacyProfiles.find(p => p.id === selectedPharmacy.id)
+    ? farmacias.find(p => p.id_farmacia === selectedPharmacy.id_farmacia)
     : null
 
-  const cartTotal = cart.reduce((sum, item) => sum + item.product.precio * item.qty, 0)
+  const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.precio) * item.qty, 0)
   const cartCount = cart.reduce((sum, item) => sum + item.qty, 0)
-  const stockOk = (item) => item.estado !== 'Crítico'
+  const stockOk = (item) => Number(item.stock_actual) > 0
 
   function addToCart(product, qty) {
     if (qty < 1) return
     setCart(prev => {
-      const exist = prev.find(c => c.product.id === product.id)
+      const exist = prev.find(c => c.product.id_producto === product.id_producto)
       if (exist) {
         return prev.map(c =>
-          c.product.id === product.id ? { ...c, qty: c.qty + qty } : c
+          c.product.id_producto === product.id_producto ? { ...c, qty: c.qty + qty } : c
         )
       }
       return [...prev, { product, qty }]
@@ -709,13 +732,13 @@ export default function NewOrderPage({ user }) {
   }
 
   function removeFromCart(productId) {
-    setCart(prev => prev.filter(c => c.product.id !== productId))
+    setCart(prev => prev.filter(c => c.product.id_producto !== productId))
   }
 
   function updateQty(productId, qty) {
     if (qty < 1) { removeFromCart(productId); return }
     setCart(prev =>
-      prev.map(c => (c.product.id === productId ? { ...c, qty } : c))
+      prev.map(c => (c.product.id_producto === productId ? { ...c, qty } : c))
     )
   }
 
@@ -765,46 +788,42 @@ export default function NewOrderPage({ user }) {
     setShowInvoice(true)
   }
 
-  function handlePaymentSuccess(paymentInfo = {}) {
+  async function handlePaymentSuccess(paymentInfo = {}) {
     setPaymentInfo(paymentInfo)
 
-    const savedOrders = JSON.parse(localStorage.getItem('dronSalud_orders') || '[]')
-    const allIds = [...ordersData, ...savedOrders].map(o => o.id)
-    let nextNum = 3904
-    while (allIds.includes(`ORD-${nextNum}`)) nextNum++
-
-    const cartTotal = cart.reduce((sum, item) => sum + item.product.precio * item.qty, 0)
+    const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.precio) * item.qty, 0)
     const cargoDron = 5000
     const iva = Math.round(cartTotal * 0.16)
 
-    const newOrder = {
-      id: `ORD-${nextNum}`,
-      farmacia: profile.nombre,
-      farmaciaId: selectedPharmacy.id,
-      clienteId: user?.id || 'CLI-001',
-      estado: 'Pendiente',
-      dron: '—',
-      fecha: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-      productos: cart.map(item => ({
-        id: item.product.id,
-        nombre: item.product.nombre + ' ' + item.product.concentracion,
-        cantidad: item.qty,
-        precio: item.product.precio,
-      })),
-      subtotal: cartTotal,
-      cargo_dron: cargoDron,
-      iva: iva,
-      total: cartTotal + cargoDron + iva,
-      referencia: paymentInfo.mobileRef || '',
-      destino: {
-        nombre: deliveryLocation.nombre || (deliveryLocation.address ? deliveryLocation.address.split(',')[0] : 'Dirección'),
-        direccion: deliveryLocation.direccion || deliveryLocation.address || '',
-        lat: deliveryLocation.lat,
-        lng: deliveryLocation.lng,
-      },
-    }
+    try {
+      const pedido = await createPedido({
+        id_farmacia: selectedPharmacy.id_farmacia,
+        subtotal: cartTotal,
+        cargo_dron: cargoDron,
+        iva: iva,
+        total: cartTotal + cargoDron + iva,
+        destino_nombre: deliveryLocation.nombre || (deliveryLocation.address ? deliveryLocation.address.split(',')[0] : 'Dirección'),
+        destino_direccion: deliveryLocation.direccion || deliveryLocation.address || '',
+        latitud_entrega: String(deliveryLocation.lat),
+        longitud_entrega: String(deliveryLocation.lng),
+        productos: cart.map(item => ({
+          id_producto: item.product.id_producto,
+          nombre_producto: item.product.nombre + ' ' + (item.product.concentracion || ''),
+          cantidad: item.qty,
+          precio_unitario: Number(item.product.precio),
+        })),
+      })
 
-    localStorage.setItem('dronSalud_orders', JSON.stringify([...savedOrders, newOrder]))
+      await createPago({
+        id_pedido: pedido.id_pedido,
+        id_farmacia: selectedPharmacy.id_farmacia,
+        metodo: 'PagoMovil',
+        monto: pedido.total,
+        referencia: paymentInfo.mobileRef || '',
+      })
+    } catch (err) {
+      console.error('Error al crear pedido:', err)
+    }
 
     setShowPayment(false)
     setShowDroneInstructions(true)
@@ -849,29 +868,21 @@ export default function NewOrderPage({ user }) {
           </p>
         </div>
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-          {pharmacyProfiles.map(p => (
+          {farmacias.map(p => (
             <button
-              key={p.id}
+              key={p.id_farmacia}
               onClick={() => setSelectedPharmacy(p)}
               className="group relative bg-white rounded-3xl border border-slate-100 overflow-hidden hover:border-sky-200 hover:shadow-[0_12px_40px_rgba(14,165,233,0.12)] transition-all duration-500 text-left"
             >
               <div className="h-48 bg-gradient-to-br from-sky-500 to-blue-600 relative overflow-hidden">
-                {p.fotoFachada ? (
-                  <img src={p.fotoFachada} alt="" className="w-full h-full object-cover opacity-60 group-hover:opacity-40 transition-opacity duration-500" />
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-br from-sky-500/20 to-blue-600/20" />
-                )}
+                <div className="absolute inset-0 bg-gradient-to-br from-sky-500/20 to-blue-600/20" />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent" />
                 <div className="absolute bottom-4 left-4 right-4 flex items-center gap-3">
                   <div className="w-14 h-14 rounded-2xl bg-white/90 backdrop-blur-md flex items-center justify-center shadow-lg flex-shrink-0 overflow-hidden">
-                    {p.logo ? (
-                      <img src={p.logo} alt={p.nombre} className="w-full h-full object-contain p-1" />
-                    ) : (
-                      <span className="text-xl font-bold bg-gradient-to-br from-sky-600 to-blue-700 bg-clip-text text-transparent">{p.nombre.charAt(0)}</span>
-                    )}
+                    <span className="text-xl font-bold bg-gradient-to-br from-sky-600 to-blue-700 bg-clip-text text-transparent">{p.nombre_comercial.charAt(0)}</span>
                   </div>
                   <div className="text-white min-w-0">
-                    <div className="text-base font-bold truncate">{p.nombre}</div>
+                    <div className="text-base font-bold truncate">{p.nombre_comercial}</div>
                     <div className="text-xs text-white/70 truncate">{p.ciudad}</div>
                   </div>
                 </div>
@@ -922,10 +933,10 @@ export default function NewOrderPage({ user }) {
                   </svg>
                 </button>
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-50 to-blue-50 flex items-center justify-center text-blue-600 font-bold shrink-0">
-                  {profile.nombre.charAt(0)}
+                  {profile.nombre_comercial.charAt(0)}
                 </div>
                 <div className="min-w-0">
-                  <div className="text-sm font-bold text-slate-800 truncate">{profile.nombre}</div>
+                  <div className="text-sm font-bold text-slate-800 truncate">{profile.nombre_comercial}</div>
                   <div className="text-xs text-slate-500 truncate">{profile.direccion}</div>
                 </div>
               </div>
@@ -989,10 +1000,10 @@ export default function NewOrderPage({ user }) {
           ) : (
             <div className="px-4 lg:px-6 pb-6 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredCatalog.map(product => {
-                const inCart = cart.find(c => c.product.id === product.id)
+                const inCart = cart.find(c => c.product.id_producto === product.id_producto)
                 return (
                   <ProductCard
-                    key={product.id}
+                    key={product.id_producto}
                     product={product}
                     inCart={inCart}
                     stockOk={stockOk(product)}
@@ -1051,13 +1062,13 @@ export default function NewOrderPage({ user }) {
                 <>
                   <div className="space-y-3 max-h-[calc(100vh-350px)] overflow-y-auto pr-1">
                     {cart.map(item => (
-                      <div key={item.product.id} className="bg-slate-50 rounded-xl p-3">
+                      <div key={item.product.id_producto} className="bg-slate-50 rounded-xl p-3">
                         <div className="flex items-start gap-3 mb-2">
                           <div className="w-10 h-10 rounded-lg bg-white shadow-sm border border-slate-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                            {item.product.foto ? (
-                              <img src={item.product.foto} alt="" className="w-full h-full object-cover" />
+                            {item.product.foto_url ? (
+                              <img src={item.product.foto_url} alt="" className="w-full h-full object-cover" />
                             ) : (
-                              <div className={`w-5 h-5 rounded-full ${medicineColors[item.product.id] || 'bg-slate-300'}`} />
+                              <div className={`w-5 h-5 rounded-full ${medicineColors[item.product.id_producto] || 'bg-slate-300'}`} />
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -1066,7 +1077,7 @@ export default function NewOrderPage({ user }) {
                                 {item.product.nombre} {item.product.concentracion}
                               </div>
                               <button
-                                onClick={() => removeFromCart(item.product.id)}
+                                onClick={() => removeFromCart(item.product.id_producto)}
                                 className="text-slate-400 hover:text-red-500 transition-colors shrink-0 ml-1"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1074,23 +1085,23 @@ export default function NewOrderPage({ user }) {
                                 </svg>
                               </button>
                             </div>
-                            <div className="text-[10px] text-slate-500 mt-0.5">{item.product.unidad}</div>
+                            <div className="text-[10px] text-slate-500 mt-0.5">{item.product.unidad_medida}</div>
                           </div>
                         </div>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1">
                             <button
-                              onClick={() => updateQty(item.product.id, item.qty - 1)}
+                              onClick={() => updateQty(item.product.id_producto, item.qty - 1)}
                               className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors"
                             >−</button>
                             <span className="w-8 text-center text-sm font-bold text-slate-800">{item.qty}</span>
                             <button
-                              onClick={() => updateQty(item.product.id, item.qty + 1)}
+                              onClick={() => updateQty(item.product.id_producto, item.qty + 1)}
                               className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors"
                             >+</button>
                           </div>
                           <div className="text-xs font-bold text-slate-800">
-                            {formatCurrency(item.product.precio * item.qty)}
+                            {formatCurrency(Number(item.product.precio) * item.qty)}
                           </div>
                         </div>
                       </div>

@@ -1,0 +1,287 @@
+import { useState, useEffect } from 'react'
+import { getUsuarios, updateUsuario, updateUsuarioEstado, register, removeUsuario } from '../../api'
+import Avatar from '../../components/ui/Avatar'
+
+const inputClass = 'w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 focus:bg-white transition-all duration-200 text-sm'
+const labelClass = 'text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5 block'
+
+export default function ClientsPage() {
+  const [clientes, setClientes] = useState([])
+  const [msg, setMsg] = useState(null)
+  const [lastCredentials, setLastCredentials] = useState(null)
+  const [editingCliente, setEditingCliente] = useState(null)
+  const [editForm, setEditForm] = useState({})
+  const [confirmDelete, setConfirmDelete] = useState(null)
+
+  const [registerForm, setRegisterForm] = useState({
+    nombre: '', apellido: '', cedula: '', email: '', password: '', confirmPassword: '', telefono: ''
+  })
+
+  useEffect(() => {
+    loadClientes()
+  }, [])
+
+  function loadClientes() {
+    getUsuarios('cliente').then(data => {
+      if (Array.isArray(data)) setClientes(data)
+    }).catch(() => {})
+  }
+
+  function showMsg(text) {
+    setMsg(text)
+    setTimeout(() => setMsg(null), 5000)
+  }
+
+  async function handleRegister(e) {
+    e.preventDefault()
+    if (!registerForm.nombre || !registerForm.cedula || !registerForm.email || !registerForm.password) return
+    if (registerForm.password !== registerForm.confirmPassword) {
+      showMsg('Las contraseñas no coinciden')
+      return
+    }
+    try {
+      await register({
+        nombre: registerForm.nombre,
+        apellido: registerForm.apellido,
+        cedula: registerForm.cedula,
+        email: registerForm.email,
+        password: registerForm.password,
+        telefono: registerForm.telefono,
+        tipo_usuario: 'cliente',
+      })
+      setLastCredentials({ email: registerForm.email, password: registerForm.password })
+      showMsg(`Cliente ${registerForm.nombre} registrado correctamente`)
+      setRegisterForm({ nombre: '', apellido: '', cedula: '', email: '', password: '', confirmPassword: '', telefono: '' })
+      loadClientes()
+    } catch (err) {
+      showMsg('Error: ' + (err?.response?.data?.message || err?.response?.data?.error || 'Error al registrar'))
+    }
+  }
+
+  function startEdit(u) {
+    setEditForm({
+      nombre: u.nombre || '',
+      apellido: u.apellido || '',
+      cedula: u.cedula || '',
+      email: u.email || '',
+      telefono: u.telefono || '',
+      direccion: u.direccion || '',
+    })
+    setEditingCliente(u)
+  }
+
+  async function saveEdit() {
+    if (!editingCliente) return
+    try {
+      await updateUsuario(editingCliente.id_usuario, editForm)
+      showMsg('Cliente actualizado correctamente')
+      setEditingCliente(null)
+      loadClientes()
+    } catch (err) {
+      showMsg('Error: ' + (err?.response?.data?.message || 'Error al actualizar'))
+    }
+  }
+
+  async function executeDelete() {
+    if (!confirmDelete) return
+    try {
+      await removeUsuario(confirmDelete.id_usuario)
+      showMsg('Cliente eliminado correctamente')
+      setConfirmDelete(null)
+      loadClientes()
+    } catch (err) {
+      showMsg('Error: ' + (err?.response?.data?.message || 'Error al eliminar'))
+    }
+  }
+
+  async function toggleStatus(u) {
+    const nuevoEstado = u.estado_cuenta === 'Activo' ? 'Suspendido' : 'Activo'
+    try {
+      await updateUsuarioEstado(u.id_usuario, nuevoEstado)
+      showMsg(`Cliente ${nuevoEstado === 'Activo' ? 'activado' : 'suspendido'} correctamente`)
+      loadClientes()
+    } catch (err) {
+      showMsg('Error: ' + (err?.response?.data?.message || 'Error al cambiar estado'))
+    }
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto">
+      {msg && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-semibold rounded-2xl px-5 py-3.5 mb-6 text-center shadow-sm animate-fade-in">
+          {msg}
+        </div>
+      )}
+
+      {lastCredentials && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-2xl px-5 py-4 mb-6 shadow-sm animate-scale-in">
+          <div className="text-xs font-semibold uppercase tracking-widest mb-2">Credenciales del cliente</div>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-blue-500 font-semibold w-14">Usuario:</span>
+              <span className="font-mono font-bold">{lastCredentials.email}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-blue-500 font-semibold w-14">Clave:</span>
+              <span className="font-mono font-bold">{lastCredentials.password}</span>
+            </div>
+          </div>
+          <button onClick={() => setLastCredentials(null)} className="mt-3 text-xs text-blue-600 hover:text-blue-800 font-semibold">Cerrar</button>
+        </div>
+      )}
+
+      <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 p-8 mb-6">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center text-white text-lg font-bold shadow-lg shadow-teal-500/20">C</div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Registrar nuevo cliente</h3>
+            <p className="text-sm text-gray-400 mt-0.5">Cree una cuenta de cliente en el sistema</p>
+          </div>
+        </div>
+        <form onSubmit={handleRegister} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label className={labelClass}>Nombre</label>
+              <input value={registerForm.nombre} onChange={e => setRegisterForm({ ...registerForm, nombre: e.target.value })} placeholder="Ej. Juan" className={inputClass} required />
+            </div>
+            <div>
+              <label className={labelClass}>Apellido</label>
+              <input value={registerForm.apellido} onChange={e => setRegisterForm({ ...registerForm, apellido: e.target.value })} placeholder="Ej. Pérez" className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Cédula</label>
+              <input value={registerForm.cedula} onChange={e => setRegisterForm({ ...registerForm, cedula: e.target.value })} placeholder="Ej. V-12345678" className={inputClass} required />
+            </div>
+            <div>
+              <label className={labelClass}>Correo electrónico</label>
+              <input type="email" value={registerForm.email} onChange={e => setRegisterForm({ ...registerForm, email: e.target.value })} placeholder="Ej. juan@correo.com" className={inputClass} required />
+            </div>
+            <div>
+              <label className={labelClass}>Teléfono</label>
+              <input value={registerForm.telefono} onChange={e => setRegisterForm({ ...registerForm, telefono: e.target.value })} placeholder="Ej. 0412-1234567" className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Contraseña</label>
+              <input type="password" value={registerForm.password} onChange={e => setRegisterForm({ ...registerForm, password: e.target.value })} placeholder="Min. 8 caracteres" className={inputClass} required />
+            </div>
+            <div>
+              <label className={labelClass}>Confirmar contraseña</label>
+              <input type="password" value={registerForm.confirmPassword} onChange={e => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })} placeholder="Repite la contraseña" className={inputClass} required />
+            </div>
+          </div>
+          <button type="submit" className="w-full bg-gradient-to-r from-cyan-600 to-teal-700 text-white font-bold py-3.5 rounded-2xl transition-all duration-200 shadow-lg shadow-teal-500/25 hover:shadow-xl active:scale-[0.98]">
+            Registrar cliente
+          </button>
+        </form>
+      </div>
+
+      <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-100 to-teal-100 flex items-center justify-center text-teal-700 text-sm font-bold">C</div>
+            <div>
+              <h3 className="text-base font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Clientes registrados</h3>
+              <p className="text-xs text-gray-400 mt-0.5">{clientes.length} cliente{clientes.length !== 1 ? 's' : ''}</p>
+            </div>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs font-semibold text-gray-500 uppercase tracking-widest border-b border-gray-100">
+                <th className="text-left pb-3 pr-4 w-12"></th>
+                <th className="text-left pb-3 pr-4">Nombre</th>
+                <th className="text-left pb-3 pr-4">Email</th>
+                <th className="text-left pb-3 pr-4">Teléfono</th>
+                <th className="text-left pb-3 pr-4">Estado</th>
+                <th className="text-left pb-3">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clientes.length === 0 ? (
+                <tr><td colSpan="6" className="py-8 text-center text-gray-400 text-sm">No hay clientes registrados</td></tr>
+              ) : (
+                clientes.map(u => (
+                  <tr key={u.id_usuario} className="border-b border-gray-50">
+                    <td className="py-3 pr-4">
+                      <Avatar src={u.foto_url} name={u.nombre} size="md" />
+                    </td>
+                    <td className="py-3 pr-4 font-semibold text-gray-800">{u.nombre} {u.apellido || ''}</td>
+                    <td className="py-3 pr-4 text-gray-600">{u.email}</td>
+                    <td className="py-3 pr-4 text-gray-600">{u.telefono || '—'}</td>
+                    <td className="py-3 pr-4">
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${u.estado_cuenta === 'Activo' ? 'bg-emerald-50 text-emerald-600' : u.estado_cuenta === 'Suspendido' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600'}`}>
+                        {u.estado_cuenta}
+                      </span>
+                    </td>
+                    <td className="py-3">
+                      <div className="flex gap-1.5">
+                        <button onClick={() => startEdit(u)} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Editar">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        </button>
+                        <button onClick={() => toggleStatus(u)} className={`p-1.5 rounded-lg transition-all ${u.estado_cuenta === 'Activo' ? 'text-gray-400 hover:text-red-600 hover:bg-red-50' : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'}`} title={u.estado_cuenta === 'Activo' ? 'Suspender' : 'Activar'}>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={u.estado_cuenta === 'Activo' ? 'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636' : 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'} /></svg>
+                        </button>
+                        <button onClick={() => setConfirmDelete(u)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all" title="Eliminar">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {editingCliente && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setEditingCliente(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-8 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Editar cliente</h3>
+              <button onClick={() => setEditingCliente(null)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className={labelClass}>Nombre</label><input value={editForm.nombre} onChange={e => setEditForm({ ...editForm, nombre: e.target.value })} className={inputClass} /></div>
+                <div><label className={labelClass}>Apellido</label><input value={editForm.apellido} onChange={e => setEditForm({ ...editForm, apellido: e.target.value })} className={inputClass} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className={labelClass}>Cédula</label><input value={editForm.cedula} onChange={e => setEditForm({ ...editForm, cedula: e.target.value })} className={inputClass} /></div>
+                <div><label className={labelClass}>Email</label><input type="email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} className={inputClass} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className={labelClass}>Teléfono</label><input value={editForm.telefono} onChange={e => setEditForm({ ...editForm, telefono: e.target.value })} className={inputClass} /></div>
+                <div><label className={labelClass}>Dirección</label><input value={editForm.direccion} onChange={e => setEditForm({ ...editForm, direccion: e.target.value })} className={inputClass} /></div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setEditingCliente(null)} className="flex-1 py-3 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-all">Cancelar</button>
+                <button onClick={saveEdit} className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-cyan-600 to-teal-700 text-white font-bold text-sm shadow-lg shadow-teal-500/25 hover:shadow-xl active:scale-[0.98] transition-all">Guardar cambios</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 w-full max-w-sm text-center">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
+              <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 font-['Plus_Jakarta_Sans'] mb-2">¿Está seguro?</h3>
+            <p className="text-sm text-gray-500 mb-1">
+              Se eliminará al cliente "{confirmDelete.nombre} {confirmDelete.apellido || ''}"
+            </p>
+            <p className="text-xs text-gray-400 mb-6">Esta acción no se puede deshacer.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDelete(null)} className="flex-1 py-3 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-all">Cancelar</button>
+              <button onClick={executeDelete} className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-rose-700 text-white font-bold text-sm shadow-lg shadow-red-500/25 hover:shadow-xl active:scale-[0.98] transition-all">Sí, eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

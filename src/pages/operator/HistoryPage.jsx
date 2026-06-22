@@ -1,26 +1,36 @@
-import { useState, useMemo } from 'react'
-import { ordersData, users } from '../../data/adminData'
+import { useState, useMemo, useEffect } from 'react'
+import { getPedidos } from '../../api'
 import Badge from '../../components/ui/Badge'
 
 function formatCurrency(n) {
-  return '$' + n.toLocaleString()
+  const num = Number(n)
+  if (isNaN(num)) return 'Bs. 0,00'
+  return 'Bs. ' + num.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 export default function OperatorHistoryPage() {
+  const [pedidos, setPedidos] = useState([])
   const [selected, setSelected] = useState(null)
 
+  useEffect(() => {
+    getPedidos()
+      .then(data => {
+        const list = Array.isArray(data) ? data : (data?.pedidos || [])
+        setPedidos(list)
+      })
+      .catch(() => {})
+  }, [])
+
   const deliveredOrders = useMemo(
-    () => ordersData.filter((o) => o.estado === 'Entregado'),
-    []
+    () => pedidos.filter((o) => o.estado_pedido === 'Entregado'),
+    [pedidos]
   )
 
   const order = selected
-    ? ordersData.find((o) => o.id === selected)
+    ? pedidos.find((o) => o.id_pedido === selected)
     : null
 
-  const client = order
-    ? users.find((u) => u.id === order.clienteId)
-    : null
+  const farmacia = order?.farmacia || null
 
   return (
     <div>
@@ -41,7 +51,6 @@ export default function OperatorHistoryPage() {
                 <tr className="text-xs font-semibold text-gray-500 uppercase tracking-widest border-b border-gray-100">
                   <th className="text-left pb-3 pr-4">Orden</th>
                   <th className="text-left pb-3 pr-4">Farmacia</th>
-                  <th className="text-left pb-3 pr-4">Cliente</th>
                   <th className="text-left pb-3 pr-4">Total</th>
                   <th className="text-left pb-3">Fecha</th>
                 </tr>
@@ -49,29 +58,25 @@ export default function OperatorHistoryPage() {
               <tbody>
                 {deliveredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="py-12 text-center text-gray-400 text-sm">
+                    <td colSpan="4" className="py-12 text-center text-gray-400 text-sm">
                       No hay entregas registradas
                     </td>
                   </tr>
                 ) : (
-                  deliveredOrders.map((o, i) => {
-                    const c = users.find((u) => u.id === o.clienteId)
-                    return (
-                      <tr
-                        key={o.id}
-                        onClick={() => setSelected(selected === o.id ? null : o.id)}
-                        className={`border-b border-gray-50 transition-colors cursor-pointer ${
-                          selected === o.id ? 'bg-indigo-50' : 'hover:bg-indigo-50'
-                        }`}
-                      >
-                        <td className="py-3 pr-4 text-indigo-600 font-semibold whitespace-nowrap">{o.id}</td>
-                        <td className="py-3 pr-4 text-gray-800 font-medium">{o.farmacia}</td>
-                        <td className="py-3 pr-4 text-gray-800">{c?.nombre || 'Cliente'}</td>
-                        <td className="py-3 pr-4 text-gray-800 font-semibold whitespace-nowrap">{formatCurrency(o.total)}</td>
-                        <td className="py-3 text-gray-500 text-xs whitespace-nowrap">{o.fecha}</td>
-                      </tr>
-                    )
-                  })
+                  deliveredOrders.map((o, i) => (
+                    <tr
+                      key={o.id_pedido}
+                      onClick={() => setSelected(selected === o.id_pedido ? null : o.id_pedido)}
+                      className={`border-b border-gray-50 transition-colors cursor-pointer ${
+                        selected === o.id_pedido ? 'bg-indigo-50' : 'hover:bg-indigo-50'
+                      }`}
+                    >
+                      <td className="py-3 pr-4 text-indigo-600 font-semibold whitespace-nowrap">#{o.id_pedido}</td>
+                      <td className="py-3 pr-4 text-gray-800 font-medium">{o.farmacia?.nombre_comercial || `Farmacia #${o.id_farmacia}`}</td>
+                      <td className="py-3 pr-4 text-gray-800 font-semibold whitespace-nowrap">{formatCurrency(o.total)}</td>
+                      <td className="py-3 text-gray-500 text-xs whitespace-nowrap">{o.fecha_creacion ? new Date(o.fecha_creacion).toLocaleDateString('es-ES') : ''}</td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -82,20 +87,15 @@ export default function OperatorHistoryPage() {
           {order ? (
             <div className="space-y-6">
               <div>
-                <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">{order.id}</h3>
-                <p className="text-[10px] text-gray-400 mt-0.5">{order.fecha}</p>
+                <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">#{order.id_pedido}</h3>
+                <p className="text-[10px] text-gray-400 mt-0.5">{order.fecha_creacion ? new Date(order.fecha_creacion).toLocaleDateString('es-ES') : ''}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-4 border border-emerald-200">
-                  <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-2">Farmacia</div>
-                  <div className="text-sm font-bold text-gray-800">{order.farmacia}</div>
-                </div>
-                {client && (
-                  <div className="bg-gradient-to-br from-sky-50 to-blue-50 rounded-2xl p-4 border border-blue-200">
-                    <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-2">Cliente</div>
-                    <div className="text-sm font-bold text-gray-800">{client.nombre}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{client.telefono}</div>
+                {farmacia && (
+                  <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-4 border border-emerald-200">
+                    <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-2">Farmacia</div>
+                    <div className="text-sm font-bold text-gray-800">{farmacia.nombre_comercial}</div>
                   </div>
                 )}
               </div>
@@ -103,15 +103,15 @@ export default function OperatorHistoryPage() {
               <div>
                 <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-3">Productos</div>
                 <div className="space-y-2">
-                  {order.productos.map((p, i) => (
+                  {(order.detalles || []).map((p, i) => (
                     <div key={i} className="flex items-center justify-between text-sm bg-gray-50 rounded-xl p-3">
                       <div>
-                        <div className="font-semibold text-gray-800">{p.nombre}</div>
+                        <div className="font-semibold text-gray-800">{p.nombre_producto}</div>
                         <div className="text-xs text-gray-500">x{p.cantidad}</div>
                       </div>
                       <div className="text-right">
-                        <div className="font-semibold text-gray-800">{formatCurrency(p.precio * p.cantidad)}</div>
-                        <div className="text-[10px] text-gray-400">{formatCurrency(p.precio)} c/u</div>
+                        <div className="font-semibold text-gray-800">{formatCurrency(Number(p.precio_unitario) * p.cantidad)}</div>
+                        <div className="text-[10px] text-gray-400">{formatCurrency(p.precio_unitario)} c/u</div>
                       </div>
                     </div>
                   ))}
@@ -128,17 +128,17 @@ export default function OperatorHistoryPage() {
                 </div>
               </div>
 
-              {order.destino && (
+              {(order.destino_nombre || order.destino_direccion) && (
                 <div className="bg-gray-50 rounded-2xl p-4">
                   <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-2">Destino de entrega</div>
-                  <div className="text-sm font-semibold text-gray-800">{order.destino.nombre}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">{order.destino.direccion}</div>
+                  <div className="text-sm font-semibold text-gray-800">{order.destino_nombre || 'Dirección'}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{order.destino_direccion}</div>
                 </div>
               )}
 
               <div className="text-xs text-gray-400 text-center pt-2 space-y-1">
-                {order.operador && <div>Operador: {order.operador}</div>}
-                {order.dron && order.dron !== '—' && <div>Dron: {order.dron}</div>}
+                {order.id_operador && <div>Operador ID: {order.id_operador}</div>}
+                {order.id_dron && <div>Dron ID: {order.id_dron}</div>}
               </div>
             </div>
           ) : (

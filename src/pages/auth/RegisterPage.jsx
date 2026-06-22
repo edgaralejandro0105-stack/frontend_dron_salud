@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { register } from '../../api'
 import logo from '../../assets/Dron_Salud.png'
 
 function InputField({ label, type = 'text', placeholder = '', icon = null, value, onChange, name }) {
@@ -42,7 +43,7 @@ function SubmitButton({ children, loading = false }) {
   )
 }
 
-export default function RegisterPage({ onBackToLogin }) {
+export default function RegisterPage({ onBackToLogin, onLoginSuccess }) {
   const [formData, setFormData] = useState({
     nombre: '',
     apellido: '',
@@ -54,6 +55,7 @@ export default function RegisterPage({ onBackToLogin }) {
   })
   const [errorMessage, setErrorMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const [successData, setSuccessData] = useState(null)
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -70,15 +72,75 @@ export default function RegisterPage({ onBackToLogin }) {
     }
 
     setLoading(true)
-    setTimeout(() => {
+    try {
+      const { nombre, apellido, cedula, email, telefono, password_hash } = formData
+      const result = await register({
+        nombre, apellido, cedula, email,
+        password: password_hash,
+        telefono,
+        tipo_usuario: 'cliente',
+      })
+      localStorage.setItem('token', result.token)
+      const user = {
+        ...result.usuario,
+        role: result.usuario.tipo_usuario,
+        nombre: result.usuario.nombre + ' ' + (result.usuario.apellido || ''),
+      }
+      localStorage.setItem('user', JSON.stringify(user))
       setLoading(false)
-      alert('Cuenta creada con éxito (simulación).')
-    }, 800)
+      setSuccessData(user)
+      setTimeout(() => {
+        if (onLoginSuccess) onLoginSuccess(user)
+      }, 2500)
+    } catch (err) {
+      setLoading(false)
+      const msg = err?.response?.data?.message || err?.response?.data?.error || 'Error al crear la cuenta. Intenta de nuevo.'
+      setErrorMessage(msg)
+    }
   }
 
   const handleLoginRedirect = (e) => {
     e.preventDefault()
     if (onBackToLogin) onBackToLogin()
+  }
+
+  if (successData) {
+    return (
+      <div className="min-h-screen flex bg-gradient-to-br from-[#081428] via-[#0c1f42] to-[#112a50]">
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="w-full max-w-md animate-scale-in">
+            <div className="bg-white/90 backdrop-blur-2xl rounded-3xl shadow-2xl shadow-emerald-500/10 border border-emerald-200/50 p-10 text-center">
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30 animate-bounce-soft">
+                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2 font-['Plus_Jakarta_Sans']">¡Cuenta creada con éxito!</h2>
+              <p className="text-gray-500 mb-2">Bienvenido, <strong className="text-gray-800">{successData.nombre}</strong></p>
+              <p className="text-sm text-gray-400 mb-8">Estamos preparando todo para ti...</p>
+              <div className="flex justify-center">
+                <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 hidden lg:flex flex-col items-center justify-center relative">
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute -top-40 -left-40 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl animate-pulse-soft" />
+            <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl animate-pulse-soft" style={{ animationDelay: '1s' }} />
+          </div>
+          <div className="relative z-10 text-center">
+            <div className="w-24 h-24 mx-auto bg-gradient-to-br from-emerald-400/20 to-emerald-600/20 rounded-full p-5 border border-emerald-200/30 backdrop-blur-xl shadow-2xl mb-6">
+              <svg className="w-full h-full text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="text-3xl font-bold text-white font-['Plus_Jakarta_Sans'] mb-2">Redirigiendo...</h2>
+            <p className="text-emerald-200/50">Serás redirigido automáticamente</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

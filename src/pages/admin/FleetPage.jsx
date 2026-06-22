@@ -1,283 +1,289 @@
-import { useState, useRef } from 'react'
-import { fleetData as initialFleet } from '../../data/adminData'
-import Badge from '../../components/ui/Badge'
+import { useState, useEffect, useRef } from 'react'
+import { getDrones, createDron, updateDron, removeDron, uploadFile } from '../../api'
 
-const FLEET_KEY = 'dronSalud_fleet'
-
-function loadFleet() {
-  try {
-    const saved = localStorage.getItem(FLEET_KEY)
-    if (saved) return JSON.parse(saved)
-  } catch {}
-  return initialFleet
-}
-
-function saveFleet(drones) {
-  localStorage.setItem(FLEET_KEY, JSON.stringify(drones))
-}
-
-const estados = ['Disponible', 'En vuelo', 'Cargando', 'Mantenimiento']
+const estados = ['Disponible', 'En vuelo', 'Cargando', 'Mantenimiento', 'Baja']
 
 const statusColors = {
   'Disponible': 'bg-emerald-500',
   'En vuelo': 'bg-sky-500',
   'Cargando': 'bg-amber-500',
   'Mantenimiento': 'bg-rose-500',
+  'Baja': 'bg-gray-500',
 }
 
 export default function FleetPage() {
-  const [drones, setDrones] = useState(loadFleet)
+  const [drones, setDrones] = useState([])
   const [modal, setModal] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null)
 
-  function handleSave(form) {
-    let updated
-    if (modal.mode === 'add') {
-      updated = [...drones, { ...form }]
+  useEffect(() => {
+    if (modal) {
+      document.body.style.overflow = 'hidden'
     } else {
-      updated = drones.map(d => d.id === modal.drone.id ? { ...form } : d)
+      document.body.style.overflow = ''
     }
-    setDrones(updated)
-    saveFleet(updated)
-    setModal(null)
+    return () => { document.body.style.overflow = '' }
+  }, [modal])
+
+  useEffect(() => {
+    getDrones().then(data => {
+      if (Array.isArray(data)) setDrones(data)
+      else if (data?.drones) setDrones(data.drones)
+    }).catch(() => {})
+  }, [])
+
+  async function handleSave(form) {
+    try {
+      if (modal.mode === 'add') {
+        const created = await createDron(form)
+        setDrones(prev => [...prev, created])
+      } else if (modal.mode === 'edit') {
+        await updateDron(modal.drone.id_dron, form)
+        setDrones(prev => prev.map(d => d.id_dron === modal.drone.id_dron ? { ...d, ...form } : d))
+      }
+      setModal(null)
+    } catch (err) {
+      alert(err?.response?.data?.message || err?.response?.data?.error || 'Error al guardar')
+    }
   }
 
-  function handleDelete(id) {
-    const updated = drones.filter(d => d.id !== id)
-    setDrones(updated)
-    saveFleet(updated)
+  async function handleDelete() {
+    if (!confirmDelete) return
+    try {
+      await removeDron(confirmDelete.id_dron)
+      setDrones(prev => prev.filter(d => d.id_dron !== confirmDelete.id_dron))
+      setConfirmDelete(null)
+    } catch (err) {
+      alert(err?.response?.data?.message || err?.response?.data?.error || 'Error al eliminar')
+    }
   }
 
   return (
     <>
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-md">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.5 6.5l3-2.5v4l-3-1.5zM10 13l-4 2.5v-4l4 1.5zM20 11l-6 3.5v-4l6-1.5zM8 10l4 2.5v4l-4-2.5z" />
-              <circle cx="12" cy="12" r="2" />
-            </svg>
-          </div>
+      <div className="card-hover bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100">
+        <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-100">
           <div>
-            <h2 className="text-lg font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Flota de Drones</h2>
-            <p className="text-xs text-gray-500 font-medium">{drones.length} drones registrados</p>
+            <h3 className="text-lg font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Flota de Drones</h3>
+            <p className="text-sm text-gray-500 mt-0.5">{drones.length} drone{drones.length !== 1 ? 's' : ''} registrado{drones.length !== 1 ? 's' : ''}</p>
+          </div>
+          <button
+            onClick={() => setModal({ mode: 'add', drone: null })}
+            className="bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.97]"
+          >
+            + Agregar Dron
+          </button>
+        </div>
+
+        <div className="p-6">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs font-semibold text-gray-500 uppercase tracking-widest border-b border-gray-100">
+                  <th className="text-left pb-3 pr-3 w-12"></th>
+                  <th className="text-left pb-3 pr-4">Matricula</th>
+                  <th className="text-left pb-3 pr-4">Modelo</th>
+                  <th className="text-left pb-3 pr-4">Estado</th>
+                  <th className="text-left pb-3">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {drones.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="py-12 text-center text-gray-400 text-sm">
+                      No hay drones registrados
+                    </td>
+                  </tr>
+                ) : (
+                  drones.map((d, i) => (
+                    <tr key={d.id_dron} className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors">
+                      <td className="py-3 pr-3">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-100 to-blue-100 flex items-center justify-center text-indigo-600 font-bold text-xs border border-indigo-200">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                      </td>
+                      <td className="py-3 pr-4 font-semibold text-gray-800">{d.matricula}</td>
+                      <td className="py-3 pr-4 text-gray-600">{d.modelo}</td>
+                    <td className="py-3 pr-4">
+                      <span className={`inline-block w-2 h-2 rounded-full ${statusColors[d.estado_operativo] || 'bg-gray-400'} mr-1.5`} />
+                      <span className="text-xs font-semibold text-gray-700">{d.estado_operativo}</span>
+                    </td>
+                      <td className="py-3">
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setModal({ mode: 'edit', drone: d })}
+                            className="p-1.5 rounded-lg hover:bg-blue-100 text-blue-600 transition-colors"
+                            title="Editar"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => setConfirmDelete(d)}
+                            className="p-1.5 rounded-lg hover:bg-red-100 text-red-500 transition-colors"
+                            title="Eliminar"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-        <button
-          onClick={() => setModal({ mode: 'add', drone: null })}
-          className="bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.97] flex items-center gap-2"
-        >
-          <span className="text-base leading-none">+</span> Agregar Dron
-        </button>
       </div>
 
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-        {drones.map((drone, i) => (
-          <div
-            key={drone.id}
-            className="group bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-[0_12px_40px_rgb(0,0,0,0.1)] hover:-translate-y-0.5 animate-fade-in-up"
-            style={{ animationDelay: `${i * 80}ms` }}
-          >
-            <div className="flex flex-col sm:flex-row">
-              <div className="sm:w-48 h-48 sm:h-auto bg-gray-50 relative overflow-hidden shrink-0">
-                {drone.foto ? (
-                  <img src={drone.foto} alt={drone.modelo} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
-                    <svg className="w-14 h-14 mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M14.5 6.5l3-2.5v4l-3-1.5zM10 13l-4 2.5v-4l4 1.5zM20 11l-6 3.5v-4l6-1.5zM8 10l4 2.5v4l-4-2.5z" />
-                      <circle cx="12" cy="12" r="2" />
-                    </svg>
-                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Sin foto</span>
-                  </div>
-                )}
-                <div className={`absolute top-3 left-3 w-2.5 h-2.5 rounded-full ${statusColors[drone.estado] || 'bg-gray-400'} shadow-[0_0_8px_rgba(0,0,0,0.15)]`} />
-              </div>
+      {modal && <DroneModal mode={modal.mode} drone={modal.drone} onSave={handleSave} onClose={() => setModal(null)} />}
 
-              <div className="flex-1 p-5 flex flex-col justify-between min-w-0">
-                <div>
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <div className="min-w-0">
-                      <h3 className="text-base font-bold text-gray-900 font-['Plus_Jakarta_Sans'] truncate">{drone.modelo}</h3>
-                      <span className="text-xs text-gray-400 font-mono font-semibold">{drone.id}</span>
-                    </div>
-                    <Badge text={drone.estado} />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs mt-4">
-                    <div>
-                      <span className="text-gray-400 font-semibold uppercase tracking-widest block mb-0.5">Matrícula</span>
-                      <span className="text-gray-800 font-bold font-mono">{drone.matricula}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-400 font-semibold uppercase tracking-widest block mb-0.5">Adquisición</span>
-                      <span className="text-gray-800 font-semibold">{drone.fechaAdquisicion}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 mt-5 pt-4 border-t border-gray-100">
-                  <button
-                    onClick={() => setModal({ mode: 'edit', drone })}
-                    className="flex-1 text-[11px] font-bold text-white bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 px-3 py-2 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.97] uppercase tracking-wider"
-                  >
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => handleDelete(drone.id)}
-                    className="flex-1 text-[11px] font-bold text-white bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 px-3 py-2 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.97] uppercase tracking-wider"
-                  >
-                    Eliminar
-                  </button>
-                </div>
-              </div>
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 w-full max-w-sm text-center">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
+              <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 font-['Plus_Jakarta_Sans'] mb-2">¿Está seguro?</h3>
+            <p className="text-sm text-gray-500 mb-1">
+              Se eliminará el dron "{confirmDelete.matricula}" ({confirmDelete.modelo})
+            </p>
+            <p className="text-xs text-gray-400 mb-6">Esta acción no se puede deshacer.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDelete(null)} className="flex-1 py-3 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-all">Cancelar</button>
+              <button onClick={handleDelete} className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-rose-700 text-white font-bold text-sm shadow-lg shadow-red-500/25 hover:shadow-xl active:scale-[0.98] transition-all">Sí, eliminar</button>
             </div>
           </div>
-        ))}
-      </div>
-
-      {drones.length === 0 && (
-        <div className="text-center py-24 text-gray-400">
-          <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M14.5 6.5l3-2.5v4l-3-1.5zM10 13l-4 2.5v-4l4 1.5zM20 11l-6 3.5v-4l6-1.5zM8 10l4 2.5v4l-4-2.5z" />
-            <circle cx="12" cy="12" r="2" />
-          </svg>
-          <p className="text-base font-bold text-gray-500">No hay drones registrados</p>
-          <p className="text-sm mt-1">Agrega el primer dron usando el botón superior</p>
         </div>
-      )}
-
-      {modal && (
-        <DroneFormModal
-          mode={modal.mode}
-          drone={modal.drone}
-          existingIds={drones.map(d => d.id)}
-          onSave={handleSave}
-          onClose={() => setModal(null)}
-        />
       )}
     </>
   )
 }
 
-function DroneFormModal({ mode, drone, existingIds, onSave, onClose }) {
-  const [id, setId] = useState(drone?.id || '')
-  const [modelo, setModelo] = useState(drone?.modelo || '')
-  const [matricula, setMatricula] = useState(drone?.matricula || '')
-  const [fechaAdquisicion, setFechaAdquisicion] = useState(drone?.fechaAdquisicion || '')
-  const [estado, setEstado] = useState(drone?.estado || 'Disponible')
-  const [foto, setFoto] = useState(drone?.foto || '')
-  const [error, setError] = useState('')
+function DroneModal({ mode, drone, onSave, onClose }) {
+  const [uploading, setUploading] = useState(false)
   const fileRef = useRef(null)
+  const [form, setForm] = useState(
+    drone
+      ? {
+          modelo: drone.modelo || '',
+          fabricante: drone.fabricante || '',
+          matricula: drone.matricula || '',
+          numero_serie: drone.numero_serie || '',
+          peso_maximo_despegue_kg: drone.peso_maximo_despegue_kg || '',
+          fecha_adquisicion: drone.fecha_adquisicion ? drone.fecha_adquisicion.split('T')[0] : '',
+          estado_operativo: drone.estado_operativo || 'Disponible',
+          horas_vuelo: drone.horas_vuelo || '',
+          foto_url: drone.foto_url || '',
+        }
+      : {
+          modelo: '',
+          fabricante: '',
+          matricula: '',
+          numero_serie: '',
+          peso_maximo_despegue_kg: '',
+          fecha_adquisicion: '',
+          estado_operativo: 'Disponible',
+          horas_vuelo: '',
+          foto_url: '',
+        }
+  )
 
-  function handleFile(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (ev) => setFoto(ev.target.result)
-    reader.readAsDataURL(file)
+  function handleChange(e) {
+    setForm({ ...form, [e.target.name]: e.target.value })
   }
 
   function handleSubmit(e) {
     e.preventDefault()
-    setError('')
-
-    if (!id.trim()) { setError('El ID del dron es obligatorio'); return }
-    if (!modelo.trim()) { setError('El modelo del dron es obligatorio'); return }
-    if (!matricula.trim()) { setError('La matrícula es obligatoria'); return }
-    if (!fechaAdquisicion) { setError('La fecha de adquisición es obligatoria'); return }
-
-    const trimmed = id.trim()
-    if (mode === 'add' && existingIds.includes(trimmed)) {
-      setError('Ya existe un dron con ese ID')
-      return
-    }
-    if (mode === 'edit' && trimmed !== drone.id && existingIds.includes(trimmed)) {
-      setError('Ya existe un dron con ese ID')
-      return
-    }
-
-    onSave({ id: trimmed, modelo: modelo.trim(), matricula: matricula.trim(), fechaAdquisicion, estado, foto })
+    const payload = { ...form }
+    if (payload.peso_maximo_despegue_kg) payload.peso_maximo_despegue_kg = Number(payload.peso_maximo_despegue_kg)
+    if (payload.horas_vuelo) payload.horas_vuelo = Number(payload.horas_vuelo)
+    onSave(payload)
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-scale-in">
-        <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-100">
-          <h3 className="text-lg font-bold text-gray-900 font-['Plus_Jakarta_Sans']">
-            {mode === 'add' ? 'Agregar Dron' : 'Editar Dron'}
-          </h3>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all text-lg">&times;</button>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-bold text-gray-800">{mode === 'add' ? 'Agregar Dron' : 'Editar Dron'}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
         </div>
-
-        <form onSubmit={handleSubmit} className="p-6 pt-5 space-y-5">
-          <div className="flex justify-center">
-            <label className="relative cursor-pointer group">
-              <div className="w-28 h-28 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 overflow-hidden flex items-center justify-center transition-all group-hover:border-sky-400 group-hover:bg-sky-50/30">
-                {foto ? (
-                  <img src={foto} alt="Preview" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="text-center">
-                    <svg className="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span className="text-[10px] font-semibold text-gray-400 block mt-1">Foto</span>
-                  </div>
-                )}
-              </div>
-              <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/0 group-hover:bg-black/20 transition-all">
-                <span className="text-white text-2xl opacity-0 group-hover:opacity-100 transition-all drop-shadow-lg">+</span>
-              </div>
-              <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
-            </label>
-          </div>
-
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">ID del Dron</label>
-              <input type="text" value={id} onChange={e => setId(e.target.value)} placeholder="Ej: DRN-99"
-                className="w-full bg-gray-50 border border-gray-200 text-gray-800 text-sm font-semibold rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500" />
+              <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Matricula</label>
+              <input name="matricula" value={form.matricula} onChange={handleChange} placeholder="DRN-001" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" required />
             </div>
             <div>
-              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Estado</label>
-              <select value={estado} onChange={e => setEstado(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 text-gray-800 text-sm font-semibold rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+              <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Modelo</label>
+              <input name="modelo" value={form.modelo} onChange={handleChange} placeholder="DJI M300" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" required />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Fabricante</label>
+              <input name="fabricante" value={form.fabricante} onChange={handleChange} placeholder="DJI" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Numero de Serie</label>
+              <input name="numero_serie" value={form.numero_serie} onChange={handleChange} placeholder="SN-001" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Peso Max. Despegue (kg)</label>
+              <input name="peso_maximo_despegue_kg" type="number" step="0.01" value={form.peso_maximo_despegue_kg} onChange={handleChange} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Horas de Vuelo</label>
+              <input name="horas_vuelo" type="number" step="0.01" value={form.horas_vuelo} onChange={handleChange} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Fecha Adquisicion</label>
+              <input name="fecha_adquisicion" type="date" value={form.fecha_adquisicion} onChange={handleChange} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Estado</label>
+              <select name="estado_operativo" value={form.estado_operativo} onChange={handleChange} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm">
                 {estados.map(e => <option key={e} value={e}>{e}</option>)}
               </select>
             </div>
           </div>
-
           <div>
-            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Modelo</label>
-            <input type="text" value={modelo} onChange={e => setModelo(e.target.value)} placeholder="Ej: DJI Mavic 3 Enterprise"
-              className="w-full bg-gray-50 border border-gray-200 text-gray-800 text-sm font-semibold rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Matrícula</label>
-              <input type="text" value={matricula} onChange={e => setMatricula(e.target.value)} placeholder="Ej: YV-312-DRN"
-                className="w-full bg-gray-50 border border-gray-200 text-gray-800 text-sm font-semibold rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500" />
+            <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Foto del Dron</label>
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                {uploading ? 'Subiendo...' : 'Seleccionar imagen'}
+              </button>
+              {form.foto_url && (
+                <div className="flex items-center gap-2">
+                  <img src={form.foto_url} alt="preview" className="w-10 h-10 object-cover rounded-lg border border-gray-200" />
+                  <button type="button" onClick={() => setForm({ ...form, foto_url: '' })} className="text-red-500 hover:text-red-700 text-xs font-semibold">Eliminar</button>
+                </div>
+              )}
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                setUploading(true)
+                try {
+                  const result = await uploadFile(file)
+                  setForm({ ...form, foto_url: result.url })
+                } catch (err) {
+                  alert('Error al subir la imagen')
+                }
+                setUploading(false)
+              }} />
             </div>
-            <div>
-              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Fecha Adquisición</label>
-              <input type="date" value={fechaAdquisicion} onChange={e => setFechaAdquisicion(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 text-gray-800 text-sm font-semibold rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500" />
-            </div>
           </div>
-
-          {error && (
-            <div className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">{error}</div>
-          )}
-
           <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose}
-              className="flex-1 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-4 py-2.5 rounded-xl transition-all duration-200">
-              Cancelar
+            <button type="submit" className="flex-1 bg-gradient-to-r from-sky-600 to-blue-700 text-white font-semibold py-2.5 rounded-xl text-sm shadow-md">
+              {mode === 'add' ? 'Agregar' : 'Guardar Cambios'}
             </button>
-            <button type="submit"
-              className="flex-1 text-sm font-semibold text-white bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 px-4 py-2.5 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.97]">
-              {mode === 'add' ? 'Agregar' : 'Guardar'}
+            <button type="button" onClick={onClose} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl text-sm">
+              Cancelar
             </button>
           </div>
         </form>

@@ -4,6 +4,7 @@ import NewOrderPage from './NewOrderPage'
 import PurchaseHistoryPage from './PurchaseHistoryPage'
 import SupportButton from '../../components/ui/SupportButton'
 import UserProfileCard from '../../components/ui/UserProfileCard'
+import Avatar from '../../components/ui/Avatar'
 
 const tabs = [
   { key: 'shop', label: 'Nuevo Pedido' },
@@ -62,9 +63,7 @@ export default function ShoppingPage({ user, onLogout, onUpdateUser }) {
               onClick={() => setShowProfile(!showProfile)}
               className="flex items-center gap-2.5 group"
             >
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-blue-500/25 group-hover:shadow-blue-500/40 transition-all">
-                {user?.nombre?.charAt(0) || 'U'}
-              </div>
+              <Avatar src={user?.foto_url} name={user?.nombre} size="md" rounded="xl" className="shadow-blue-500/25" />
               <span className="text-sm font-semibold text-slate-700 group-hover:text-slate-900 transition-colors hidden sm:block">
                 {user?.nombre || 'Usuario'}
               </span>
@@ -77,12 +76,10 @@ export default function ShoppingPage({ user, onLogout, onUpdateUser }) {
               <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.12)] border border-slate-100 animate-scale-in overflow-hidden z-50">
                 <div className="p-5 pb-3 border-b border-slate-100">
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
-                      {user?.nombre?.charAt(0) || 'U'}
-                    </div>
+                    <Avatar src={user?.foto_url} name={user?.nombre} size="xl" rounded="xl" />
                     <div className="min-w-0">
                       <div className="text-sm font-bold text-slate-900 truncate">{user?.nombre || 'Usuario'}</div>
-                      <div className="text-xs text-slate-500">{user?.rol || ''}</div>
+                      <div className="text-xs text-slate-500">{user?.role || ''}</div>
                     </div>
                   </div>
                 </div>

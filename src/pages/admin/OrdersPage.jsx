@@ -1,15 +1,11 @@
-import { useState } from 'react'
-import { ordersData, pharmacyProfiles } from '../../data/adminData'
+import { useState, useEffect, useMemo } from 'react'
+import { getPedidos, getFarmacias } from '../../api'
 import Badge from '../../components/ui/Badge'
 
 function formatCurrency(n) {
-  return '$' + n.toLocaleString()
-}
-
-function parseDate(str) {
-  const [d] = str.split(' ')
-  const [day, month, year] = d.split('/')
-  return new Date(+year, +month - 1, +day)
+  const num = Number(n)
+  if (isNaN(num)) return 'Bs. 0,00'
+  return 'Bs. ' + num.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 export default function OrdersPage() {
@@ -17,27 +13,43 @@ export default function OrdersPage() {
   const [filtroFechaDesde, setFiltroFechaDesde] = useState('')
   const [filtroFechaHasta, setFiltroFechaHasta] = useState('')
   const [filtroFarmacia, setFiltroFarmacia] = useState('')
+  const [pedidos, setPedidos] = useState([])
+  const [farmacias, setFarmacias] = useState([])
 
-  const filteredOrders = ordersData.filter(order => {
-    if (filtroFechaDesde) {
-      const desde = new Date(filtroFechaDesde)
-      if (parseDate(order.fecha) < desde) return false
-    }
-    if (filtroFechaHasta) {
-      const hasta = new Date(filtroFechaHasta)
-      if (parseDate(order.fecha) > hasta) return false
-    }
-    if (filtroFarmacia && order.farmacia !== filtroFarmacia) return false
-    return true
-  })
+  useEffect(() => {
+    Promise.all([getPedidos(), getFarmacias()])
+      .then(([p, f]) => {
+        if (Array.isArray(p)) setPedidos(p)
+        else if (p?.pedidos) setPedidos(p.pedidos)
+        if (Array.isArray(f)) setFarmacias(f)
+        else if (f?.farmacias) setFarmacias(f.farmacias)
+      })
+      .catch(() => {})
+  }, [])
+
+  const filteredOrders = useMemo(() => {
+    return pedidos.filter(order => {
+      if (filtroFechaDesde) {
+        const desde = new Date(filtroFechaDesde)
+        if (new Date(order.fecha_creacion) < desde) return false
+      }
+      if (filtroFechaHasta) {
+        const hasta = new Date(filtroFechaHasta)
+        if (new Date(order.fecha_creacion) > hasta) return false
+      }
+      if (filtroFarmacia) {
+        const farmacia = farmacias.find(f => f.id_farmacia === order.id_farmacia)
+        if (farmacia?.nombre_comercial !== filtroFarmacia) return false
+      }
+      return true
+    })
+  }, [pedidos, filtroFechaDesde, filtroFechaHasta, filtroFarmacia, farmacias])
 
   const order = selected
-    ? ordersData.find(o => o.id === selected)
+    ? pedidos.find(o => o.id_pedido === selected)
     : null
 
-  const profile = order
-    ? pharmacyProfiles.find(p => p.id === order.farmaciaId)
-    : null
+  const profile = order?.farmacia || null
 
   return (
     <>
@@ -74,8 +86,8 @@ export default function OrdersPage() {
                 className="bg-gray-50 border border-gray-200 text-gray-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500"
               >
                 <option value="">Todas</option>
-                {pharmacyProfiles.map(p => (
-                  <option key={p.id} value={p.nombre}>{p.nombre}</option>
+                {farmacias.map(p => (
+                  <option key={p.id_farmacia} value={p.nombre_comercial}>{p.nombre_comercial}</option>
                 ))}
               </select>
             </div>
@@ -107,18 +119,18 @@ export default function OrdersPage() {
                 ) : (
                   filteredOrders.map((order, i) => (
                   <tr
-                    key={order.id}
-                    onClick={() => setSelected(selected === order.id ? null : order.id)}
+                    key={order.id_pedido}
+                    onClick={() => setSelected(selected === order.id_pedido ? null : order.id_pedido)}
                     className={`border-b border-gray-50 transition-colors cursor-pointer animate-fade-in ${
-                      selected === order.id ? 'bg-blue-50/50' : 'hover:bg-blue-50/30'
+                      selected === order.id_pedido ? 'bg-blue-50/50' : 'hover:bg-blue-50/30'
                     }`}
                     style={{ animationDelay: `${i * 30}ms` }}
                   >
-                    <td className="py-3 pr-4 text-blue-600 font-semibold">{order.id}</td>
-                    <td className="py-3 pr-4 text-gray-800 font-medium">{order.farmacia}</td>
-                    <td className="py-3 pr-4 text-gray-800 font-semibold">{order.productos.length}</td>
-                    <td className="py-3 pr-4"><Badge text={order.estado} /></td>
-                    <td className="py-3 text-gray-600 font-medium">{order.dron}</td>
+                    <td className="py-3 pr-4 text-blue-600 font-semibold">#{order.id_pedido}</td>
+                    <td className="py-3 pr-4 text-gray-800 font-medium">{order.farmacia?.nombre_comercial || `Farmacia #${order.id_farmacia}`}</td>
+                    <td className="py-3 pr-4 text-gray-800 font-semibold">{(order.detalles || []).length}</td>
+                    <td className="py-3 pr-4"><Badge text={order.estado_pedido} /></td>
+                    <td className="py-3 text-gray-600 font-medium">{order.id_dron ? `#${order.id_dron}` : '—'}</td>
                   </tr>
                 )))}
               </tbody>
@@ -131,17 +143,17 @@ export default function OrdersPage() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-800">Detalle del Pedido</h3>
-                <Badge text={order.estado} />
+                <Badge text={order.estado_pedido} />
               </div>
 
               {profile && (
                 <div className="bg-gradient-to-br from-sky-50/50 to-blue-50/50 rounded-2xl p-5 space-y-3 border border-indigo-100/50">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-lg shadow-md">
-                      {profile.nombre.charAt(0)}
+                      {profile.nombre_comercial?.charAt(0) || 'F'}
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-gray-800">{profile.nombre}</div>
+                      <div className="text-sm font-bold text-gray-800">{profile.nombre_comercial}</div>
                       <div className="text-xs text-gray-500">{profile.ciudad}</div>
                     </div>
                   </div>
@@ -171,12 +183,12 @@ export default function OrdersPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {order.productos.map((p, i) => (
+                      {(order.detalles || []).map((p, i) => (
                         <tr key={i} className="border-b border-gray-100 last:border-b-0">
-                          <td className="py-2.5 pr-3 text-gray-800 font-semibold">{p.nombre}</td>
+                          <td className="py-2.5 pr-3 text-gray-800 font-semibold">{p.nombre_producto}</td>
                           <td className="py-2.5 pr-3 text-center text-gray-600">{p.cantidad}</td>
-                          <td className="py-2.5 pr-3 text-right text-gray-600">{formatCurrency(p.precio)}</td>
-                          <td className="py-2.5 text-right text-gray-800 font-semibold">{formatCurrency(p.cantidad * p.precio)}</td>
+                          <td className="py-2.5 pr-3 text-right text-gray-600">{formatCurrency(p.precio_unitario)}</td>
+                          <td className="py-2.5 text-right text-gray-800 font-semibold">{formatCurrency(p.cantidad * Number(p.precio_unitario))}</td>
                         </tr>
                       ))}
                     </tbody>
