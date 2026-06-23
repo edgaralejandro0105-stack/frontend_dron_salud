@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import logo from '../../assets/Dron_Salud.png'
 import NewOrderPage from './NewOrderPage'
 import PurchaseHistoryPage from './PurchaseHistoryPage'
@@ -15,6 +16,7 @@ export default function ShoppingPage({ user, onLogout, onUpdateUser }) {
   const [showProfile, setShowProfile] = useState(false)
   const [activeTab, setActiveTab] = useState('shop')
   const [editProfileKey, setEditProfileKey] = useState(0)
+  const profileBtnRef = useRef(null)
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAFAFA]">
@@ -60,6 +62,7 @@ export default function ShoppingPage({ user, onLogout, onUpdateUser }) {
 
           <div className="relative">
             <button
+              ref={profileBtnRef}
               onClick={() => setShowProfile(!showProfile)}
               className="flex items-center gap-2.5 group"
             >
@@ -72,8 +75,11 @@ export default function ShoppingPage({ user, onLogout, onUpdateUser }) {
               </svg>
             </button>
 
-            {showProfile && (
-              <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.12)] border border-slate-100 animate-scale-in overflow-hidden z-50">
+            {showProfile && profileBtnRef.current && createPortal(
+              (() => {
+                const rect = profileBtnRef.current.getBoundingClientRect()
+                return (
+              <div style={{ position: 'fixed', top: rect.bottom + 8, right: window.innerWidth - rect.right, zIndex: 9999, width: '18rem' }} className="bg-white rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.12)] border border-slate-100 animate-scale-in overflow-hidden">
                 <div className="p-5 pb-3 border-b border-slate-100">
                   <div className="flex items-center gap-3">
                     <Avatar src={user?.foto_url} name={user?.nombre} size="xl" rounded="xl" />
@@ -118,6 +124,9 @@ export default function ShoppingPage({ user, onLogout, onUpdateUser }) {
                   </button>
                 </div>
               </div>
+                )
+              })(),
+              document.body
             )}
           </div>
         </div>

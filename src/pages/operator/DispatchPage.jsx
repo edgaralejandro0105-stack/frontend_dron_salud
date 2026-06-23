@@ -2,14 +2,14 @@ import { useState, useMemo, useEffect } from 'react'
 import { getPedidos, getDrones, getDronesDisponibles, updateEstado, asignarDronOperador } from '../../api'
 import Badge from '../../components/ui/Badge'
 
-function ConfirmModal({ message, onConfirm, onCancel }) {
+function ConfirmModal({ message, onConfirm, onCancel, confirmText = 'Confirmar', confirmColor = 'from-rose-500 to-rose-600' }) {
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onCancel}>
       <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm mx-4 w-full animate-scale-in" onClick={(e) => e.stopPropagation()}>
         <p className="text-gray-800 text-sm font-semibold text-center mb-6">{message}</p>
         <div className="flex gap-3">
           <button onClick={onCancel} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl transition-all">Volver</button>
-          <button onClick={onConfirm} className="flex-1 bg-gradient-to-r from-rose-500 to-rose-600 text-white font-bold py-3 rounded-xl shadow-lg">Cancelar pedido</button>
+          <button onClick={onConfirm} className={`flex-1 bg-gradient-to-r ${confirmColor} text-white font-bold py-3 rounded-xl shadow-lg`}>{confirmText}</button>
         </div>
       </div>
     </div>
@@ -42,6 +42,7 @@ export default function DispatchPage({ user }) {
   const [selectedDrone, setSelectedDrone] = useState('')
   const [launched, setLaunched] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(null)
+  const [confirmFinish, setConfirmFinish] = useState(null)
 
   useEffect(() => {
     loadData()
@@ -62,7 +63,7 @@ export default function DispatchPage({ user }) {
   }
 
   const pendingOrders = useMemo(
-    () => pedidos.filter(o => o.estado_pedido === 'Preparando' || o.estado_pedido === 'Preparado' || o.estado_pedido === 'En transito'),
+    () => pedidos.filter(o => o.estado_pedido === 'Preparado' || o.estado_pedido === 'En transito'),
     [pedidos]
   )
 
@@ -79,13 +80,10 @@ export default function DispatchPage({ user }) {
     if (!selectedDrone || !order) return
     setLaunched(true)
     try {
-      await updateEstado(order.id_pedido, 'En transito')
-      try {
-        await asignarDronOperador(order.id_pedido, {
-          id_dron: Number(selectedDrone),
-          id_operador: user?.id_operador || null,
-        })
-      } catch {}
+      await asignarDronOperador(order.id_pedido, {
+        id_dron: Number(selectedDrone),
+        id_operador: user?.id_operador || null,
+      })
       setPedidos(prev => prev.map(o =>
         o.id_pedido === order.id_pedido
           ? { ...o, estado_pedido: 'En transito', id_dron: Number(selectedDrone) }
@@ -93,6 +91,7 @@ export default function DispatchPage({ user }) {
       ))
     } catch (err) {
       alert(err?.response?.data?.message || err?.response?.data?.error || 'Error al lanzar')
+      setLaunched(false)
     }
     setTimeout(() => setLaunched(false), 5000)
   }
@@ -107,6 +106,19 @@ export default function DispatchPage({ user }) {
       setLaunched(false)
     } catch (err) {
       alert(err?.response?.data?.message || err?.response?.data?.error || 'Error al cancelar')
+    }
+  }
+
+  async function handleFinish(id) {
+    try {
+      await updateEstado(id, 'Entregado')
+      setPedidos(prev => prev.map(o => o.id_pedido === id ? { ...o, estado_pedido: 'Entregado' } : o))
+      setConfirmFinish(null)
+      setSelectedOrderId(null)
+      setSelectedDrone('')
+      setLaunched(false)
+    } catch (err) {
+      alert(err?.response?.data?.message || err?.response?.data?.error || 'Error al finalizar')
     }
   }
 
@@ -268,6 +280,14 @@ export default function DispatchPage({ user }) {
                   Cancelar pedido
                 </button>
               )}
+              {order.estado_pedido === 'En transito' && (
+                <>
+                  <button onClick={() => setConfirmFinish(order.id_pedido)} className="w-full mt-2 py-2.5 rounded-xl text-xs font-semibold text-emerald-600 hover:text-emerald-800 border border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 transition-all active:scale-[0.97]">
+                    Finalizar pedido
+                  </button>
+                  <p className="text-[10px] text-gray-400 text-center mt-1">El dron volverá a estar disponible</p>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -279,7 +299,10 @@ export default function DispatchPage({ user }) {
       )}
 
       {confirmCancel && (
-        <ConfirmModal message="¿Estas seguro de cancelar este pedido?" onConfirm={() => handleCancel(confirmCancel)} onCancel={() => setConfirmCancel(null)} />
+        <ConfirmModal message="¿Estas seguro de cancelar este pedido?" onConfirm={() => handleCancel(confirmCancel)} onCancel={() => setConfirmCancel(null)} confirmText="Cancelar pedido" />
+      )}
+      {confirmFinish && (
+        <ConfirmModal message="¿Confirmas que el pedido fue entregado? El dron volverá a estar disponible." onConfirm={() => handleFinish(confirmFinish)} onCancel={() => setConfirmFinish(null)} confirmText="Sí, entregado" confirmColor="from-emerald-500 to-emerald-600" />
       )}
     </div>
   )

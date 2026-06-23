@@ -12,5 +12,8 @@ export const createFarmacia = (data) =>
 export const updateFarmacia = (id, data) =>
   api.put(`/farmacias/${id}`, data).then(r => r.data)
 
+export const updateMyFarmacia = (data) =>
+  api.put('/farmacias/own', data).then(r => r.data)
+
 export const removeFarmacia = (id) =>
   api.delete(`/farmacias/${id}`).then(r => r.data)

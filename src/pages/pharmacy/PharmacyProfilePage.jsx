@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet'
+import { useState, useRef, useEffect } from 'react'
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { getFarmacia, updateFarmacia, uploadFile } from '../../api'
+import { getFarmacia, updateMyFarmacia, uploadFile } from '../../api'
 
 const inputClass = 'w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 focus:bg-white transition-all duration-200 text-sm'
 const labelClass = 'text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5 block'
@@ -28,13 +28,6 @@ function MapResizer() {
     setTimeout(() => map.invalidateSize(), 150)
   }, [map])
   return null
-}
-
-function ClickMarker({ position, onMove }) {
-  useMapEvents({
-    click(e) { onMove(e.latlng) },
-  })
-  return position ? <Marker position={position} icon={pinIcon} interactive={false} /> : null
 }
 
 function FitBounds({ center }) {
@@ -110,7 +103,7 @@ export default function PharmacyProfilePage({ user }) {
     if (!farmaciaId) return
     setSaving(true)
     try {
-      await updateFarmacia(farmaciaId, {
+      await updateMyFarmacia({
         nombre_comercial: form.nombre_comercial,
         direccion: form.direccion,
         ciudad: form.ciudad,
@@ -119,8 +112,6 @@ export default function PharmacyProfilePage({ user }) {
         email: form.email,
         logo_url: form.logo_url,
         foto_fachada_url: form.foto_fachada_url,
-        lat: form.lat || '',
-        lng: form.lng || '',
       })
       setMsg('Perfil actualizado correctamente')
       getFarmacia(farmaciaId).then(f => setProfile(f))
@@ -129,10 +120,6 @@ export default function PharmacyProfilePage({ user }) {
     }
     setSaving(false)
     setTimeout(() => setMsg(null), 4000)
-  }
-
-  function handleMarkerMove(latlng) {
-    setMarkerPos(latlng)
   }
 
   if (!farmaciaId) return <div className="text-gray-400 text-center py-12">No hay farmacia asociada a esta cuenta</div>
@@ -198,26 +185,55 @@ export default function PharmacyProfilePage({ user }) {
         {/* Location */}
         <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 p-8">
           <h3 className="text-sm font-bold text-gray-900 mb-2 font-['Plus_Jakarta_Sans']">Ubicación</h3>
-          <p className="text-xs text-gray-400 mb-4">Haga clic en el mapa para cambiar la ubicación</p>
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 mb-4 flex items-start gap-2.5">
+            <svg className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-xs text-amber-800">La ubicación solo puede ser modificada por el equipo de soporte. Si necesitas cambiar tu ubicación, contáctalos.</p>
+          </div>
           <div className="h-[300px] rounded-2xl overflow-hidden border border-gray-200 mb-4 relative z-0">
             <MapContainer
               center={markerPos || defaultCenter}
               zoom={markerPos ? 16 : 14}
               className="h-full w-full"
               zoomControl={true}
+              dragging={false}
+              touchZoom={false}
+              scrollWheelZoom={false}
+              doubleClickZoom={false}
+              boxZoom={false}
+              keyboard={false}
             >
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
               <MapResizer />
-              <ClickMarker position={markerPos} onMove={handleMarkerMove} />
+              {markerPos && <Marker position={markerPos} icon={pinIcon} interactive={false} />}
               <FitBounds center={markerPos} />
             </MapContainer>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div><label className={labelClass}>Dirección</label><input value={form.direccion} onChange={e => setForm({ ...form, direccion: e.target.value })} className={inputClass} /></div>
-            <div><label className={labelClass}>Ciudad</label><input value={form.ciudad} onChange={e => setForm({ ...form, ciudad: e.target.value })} className={inputClass} /></div>
+            <div>
+              <label className={labelClass}>Dirección</label>
+              <input value={form.direccion} className={inputClass + ' bg-gray-100 text-gray-500 cursor-not-allowed'} disabled />
+              <p className="text-[11px] text-gray-400 mt-1.5 flex items-center gap-1">
+                <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Solo soporte puede modificar la dirección
+              </p>
+            </div>
+            <div>
+              <label className={labelClass}>Ciudad</label>
+              <input value={form.ciudad} className={inputClass + ' bg-gray-100 text-gray-500 cursor-not-allowed'} disabled />
+              <p className="text-[11px] text-gray-400 mt-1.5 flex items-center gap-1">
+                <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Solo soporte puede modificar la ciudad
+              </p>
+            </div>
           </div>
         </div>
 

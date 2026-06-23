@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react'
-import { getProductos, createProducto, updateProducto, removeProducto } from '../../api'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { getProductos, createProducto, updateProducto, removeProducto, uploadFile } from '../../api'
 import Badge from '../../components/ui/Badge'
 
 const unidades = ['Tabletas', 'Cápsulas', 'Ampollas', 'Frascos', 'ml', 'mg', 'Unidades']
@@ -17,6 +17,8 @@ export default function InventoryPage({ user }) {
   const [editProduct, setEditProduct] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [search, setSearch] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     if (!farmaciaId) return
@@ -41,6 +43,18 @@ export default function InventoryPage({ user }) {
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value })
+  }
+
+  const handleFileUpload = async (file) => {
+    if (!file) return
+    setUploading(true)
+    try {
+      const result = await uploadFile(file)
+      setForm(prev => ({ ...prev, foto_url: result.url }))
+    } catch {
+      alert('Error al subir la imagen')
+    }
+    setUploading(false)
   }
 
   const handleSubmit = async (e) => {
@@ -241,8 +255,20 @@ export default function InventoryPage({ user }) {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Foto URL</label>
-                <input name="foto_url" value={form.foto_url} onChange={handleChange} placeholder="https://..." className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" />
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Foto del producto</label>
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}
+                    className="px-4 py-2.5 bg-gradient-to-r from-sky-600 to-blue-700 text-white text-sm font-semibold rounded-xl shadow-md hover:shadow-lg transition-all disabled:opacity-50">
+                    {uploading ? 'Subiendo...' : 'Seleccionar imagen'}
+                  </button>
+                  {form.foto_url && (
+                    <div className="flex items-center gap-2">
+                      <img src={form.foto_url} alt="preview" className="w-10 h-10 object-cover rounded-lg border border-gray-200" />
+                      <button type="button" onClick={() => setForm({ ...form, foto_url: '' })} className="text-red-500 hover:text-red-700 text-xs font-semibold">Eliminar</button>
+                    </div>
+                  )}
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }} />
+                </div>
               </div>
 
               <div className="flex gap-3 pt-2">

@@ -11,3 +11,6 @@ export const getProfile = () =>
 
 export const changePassword = (currentPassword, newPassword) =>
   api.patch('/auth/password', { currentPassword, newPassword }).then(r => r.data)
+
+export const updateProfile = (data) =>
+  api.put('/auth/profile', data).then(r => r.data)

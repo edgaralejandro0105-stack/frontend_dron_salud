@@ -1,5 +1,5 @@
-export { login, register, getProfile, changePassword } from './auth'
-export { getFarmacias, getFarmacia, createFarmacia, updateFarmacia, removeFarmacia } from './farmacias'
+export { login, register, getProfile, changePassword, updateProfile } from './auth'
+export { getFarmacias, getFarmacia, createFarmacia, updateFarmacia, updateMyFarmacia, removeFarmacia } from './farmacias'
 export { getProductos, getProducto, createProducto, updateProducto, removeProducto } from './productos'
 export { getPedidos, getPedido, createPedido, updateEstado, asignarDronOperador } from './pedidos'
 export { getPagos, createPago, confirmarPago } from './pagos'
@@ -7,3 +7,4 @@ export { getDrones, getDronesDisponibles, getDron, createDron, updateDron, remov
 export { getOperadores, getOperador, createOperador, updateOperador, removeOperador } from './operadores'
 export { uploadFile } from './upload'
 export { getUsuarios, getUsuario, updateUsuario, updateUsuarioEstado, removeUsuario } from './usuarios'
+export { getDirecciones, createDireccion, deleteDireccion } from './direcciones'

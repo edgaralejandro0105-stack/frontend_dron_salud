@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getFarmacia, updateFarmacia } from '../../api'
+import { getFarmacia, updateMyFarmacia } from '../../api'
 
 const banks = [
   'Banco de Venezuela', 'Banco Mercantil', 'Banco Provincial', 'Banco Nacional de Crédito',
@@ -30,7 +30,7 @@ export default function PaymentConfigPage({ user }) {
 
   async function handleSave() {
     try {
-      await updateFarmacia(farmaciaId, {
+      await updateMyFarmacia({
         pago_movil_banco: banco,
         pago_movil_telefono: telefono,
         pago_movil_ci: ci,
@@ -58,8 +58,12 @@ export default function PaymentConfigPage({ user }) {
 
       <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 p-6 space-y-5">
         <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-md">
-            {profile?.nombre_comercial?.charAt(0) || 'F'}
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-md overflow-hidden">
+            {profile?.logo_url ? (
+              <img src={profile.logo_url} alt={profile.nombre_comercial} className="w-full h-full object-contain" />
+            ) : (
+              profile?.nombre_comercial?.charAt(0) || 'F'
+            )}
           </div>
           <div>
             <div className="text-sm font-bold text-gray-800">{profile?.nombre_comercial || 'Mi Farmacia'}</div>

@@ -15,6 +15,7 @@ const modules = [
   { key: 'order-history', label: 'Historial de Pedidos', icon: 'History', color: 'from-indigo-500 to-violet-600' },
   { key: 'payment-config', label: 'Config. Pago', icon: 'Wallet', color: 'from-emerald-500 to-green-600' },
   { key: 'pharmacy-profile', label: 'Mi Perfil', icon: 'Settings', color: 'from-blue-500 to-indigo-600' },
+  { key: 'reports', label: 'Salidas', icon: 'BarChart', color: 'from-indigo-500 to-violet-600' },
   { key: 'dispatch', label: 'Despachar', icon: 'Rocket', color: 'from-rose-500 to-red-600' },
   { key: 'delivery-history', label: 'Historial de Entregas', icon: 'CheckCircle', color: 'from-teal-500 to-emerald-600' },
 ]
@@ -23,14 +24,15 @@ const moduleTitles = {
   clientes: 'Clientes',
   inventory: 'Inventario', 'orders-received': 'Ordenes Recibidas',
   'order-history': 'Historial de Pedidos', 'payment-config': 'Config. Pago',
+  reports: 'Salidas',
   dispatch: 'Despachar', 'delivery-history': 'Historial de Entregas',
   'pharmacy-profile': 'Mi Perfil',
 }
 const roleModules = {
-  admin: ['dashboard', 'orders', 'fleet', 'users', 'clientes'],
+  admin: ['dashboard', 'orders', 'fleet', 'users', 'clientes', 'dispatch', 'reports'],
   cliente: [],
   farmacia: ['dashboard', 'orders-received', 'order-history', 'inventory', 'payment-config', 'pharmacy-profile'],
-  operador: ['dispatch', 'delivery-history'],
+  operador: ['dispatch', 'delivery-history', 'fleet'],
 }
 
 function App() {

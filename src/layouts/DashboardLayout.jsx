@@ -15,6 +15,7 @@ import OrderHistoryPage from '../pages/pharmacy/OrderHistoryPage'
 import OperatorHistoryPage from '../pages/operator/HistoryPage'
 import UserManagementPage from '../pages/admin/UserManagementPage'
 import ClientsPage from '../pages/admin/ClientsPage'
+import ReportsPage from '../pages/admin/ReportsPage'
 import SupportButton from '../components/ui/SupportButton'
 import PaymentConfigPage from '../pages/pharmacy/PaymentConfigPage'
 import PharmacyProfilePage from '../pages/pharmacy/PharmacyProfilePage'
@@ -31,6 +32,7 @@ const moduleMap = {
   'delivery-history': OperatorHistoryPage,
   users: UserManagementPage,
   clientes: ClientsPage,
+  reports: ReportsPage,
   'pharmacy-profile': PharmacyProfilePage,
 }
 

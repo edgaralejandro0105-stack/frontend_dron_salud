@@ -108,13 +108,14 @@ export default function OrdersPage() {
                   <th className="text-left pb-3 pr-4">Farmacia</th>
                   <th className="text-left pb-3 pr-4">Items</th>
                   <th className="text-left pb-3 pr-4">Estado</th>
-                  <th className="text-left pb-3">Dron</th>
+                  <th className="text-left pb-3 pr-4">Dron</th>
+                  <th className="text-left pb-3">Operador</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.length === 0 ? (
+                  {filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="py-8 text-center text-sm text-gray-400 font-semibold">No se encontraron pedidos con los filtros seleccionados</td>
+                    <td colSpan="6" className="py-8 text-center text-sm text-gray-400 font-semibold">No se encontraron pedidos con los filtros seleccionados</td>
                   </tr>
                 ) : (
                   filteredOrders.map((order, i) => (
@@ -130,7 +131,8 @@ export default function OrdersPage() {
                     <td className="py-3 pr-4 text-gray-800 font-medium">{order.farmacia?.nombre_comercial || `Farmacia #${order.id_farmacia}`}</td>
                     <td className="py-3 pr-4 text-gray-800 font-semibold">{(order.detalles || []).length}</td>
                     <td className="py-3 pr-4"><Badge text={order.estado_pedido} /></td>
-                    <td className="py-3 text-gray-600 font-medium">{order.id_dron ? `#${order.id_dron}` : '—'}</td>
+                    <td className="py-3 pr-4 text-gray-600 font-medium">{order.dron?.modelo || order.dron?.nombre || (order.id_dron ? `#${order.id_dron}` : '—')}</td>
+                    <td className="py-3 text-gray-600 font-medium">{order.operador?.usuario ? `${order.operador.usuario.nombre} ${order.operador.usuario.apellido}` : '—'}</td>
                   </tr>
                 )))}
               </tbody>
@@ -139,12 +141,29 @@ export default function OrdersPage() {
         </div>
 
         <div className="card-hover bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 p-6">
-          {order ? (
+              {order ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-800">Detalle del Pedido</h3>
                 <Badge text={order.estado_pedido} />
               </div>
+
+              {(order.operador || order.dron) && (
+                <div className="flex gap-4 text-xs">
+                  {order.operador?.usuario && (
+                    <div className="bg-gradient-to-br from-emerald-50/50 to-teal-50/50 rounded-xl px-4 py-3 border border-emerald-100/50 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                      <div><span className="text-gray-500 font-semibold">Operador:</span> <span className="text-gray-800 font-bold">{order.operador.usuario.nombre} {order.operador.usuario.apellido}</span></div>
+                    </div>
+                  )}
+                  {order.dron && (
+                    <div className="bg-gradient-to-br from-amber-50/50 to-orange-50/50 rounded-xl px-4 py-3 border border-amber-100/50 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                      <div><span className="text-gray-500 font-semibold">Dron:</span> <span className="text-gray-800 font-bold">{order.dron.modelo || order.dron.nombre}</span></div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {profile && (
                 <div className="bg-gradient-to-br from-sky-50/50 to-blue-50/50 rounded-2xl p-5 space-y-3 border border-indigo-100/50">

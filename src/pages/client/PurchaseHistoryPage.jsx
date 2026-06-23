@@ -106,10 +106,14 @@ export default function PurchaseHistoryPage({ user }) {
                   style={{ animationDelay: `${i * 30}ms` }}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-white shrink-0 ${
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-white shrink-0 overflow-hidden ${
                       isSelected ? 'bg-gradient-to-br from-sky-500 to-blue-600' : 'bg-slate-200 text-slate-500'
                     }`}>
-                      {farmacia?.nombre_comercial?.charAt(0) || 'F'}
+                      {farmacia?.logo_url ? (
+                        <img src={farmacia.logo_url} alt={farmacia.nombre_comercial} className="w-full h-full object-contain" />
+                      ) : (
+                        farmacia?.nombre_comercial?.charAt(0) || 'F'
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
@@ -142,11 +146,15 @@ export default function PurchaseHistoryPage({ user }) {
                   </span>
                 </div>
 
-                {profile && (
+                  {profile && (
                   <div className="bg-gradient-to-br from-sky-50 to-blue-50 rounded-2xl p-4 border border-sky-100">
                     <div className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-md">
-                        {profile.nombre_comercial?.charAt(0) || 'F'}
+                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-md overflow-hidden">
+                        {profile.logo_url ? (
+                          <img src={profile.logo_url} alt={profile.nombre_comercial} className="w-full h-full object-cover" />
+                        ) : (
+                          profile.nombre_comercial?.charAt(0) || 'F'
+                        )}
                       </div>
                       <div>
                         <div className="text-sm font-bold text-slate-800">{profile.nombre_comercial}</div>
@@ -198,6 +206,71 @@ export default function PurchaseHistoryPage({ user }) {
                     <div className="bg-slate-50 rounded-2xl p-4">
                       <div className="text-sm font-semibold text-slate-800">{order.destino_nombre || 'Dirección'}</div>
                       <div className="text-xs text-slate-500 mt-0.5">{order.destino_direccion}</div>
+                    </div>
+                  </div>
+                )}
+
+                {(order.estado_pedido === 'Preparado' || order.estado_pedido === 'En transito' || order.estado_pedido === 'Entregado') && (
+                  <div className="bg-gradient-to-br from-sky-50 to-blue-50 rounded-2xl p-4 border border-sky-100">
+                    <div className="flex items-center gap-2 mb-3">
+                      <svg className="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      <span className="text-[10px] font-semibold text-sky-600 uppercase tracking-wider">Estado del envío</span>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${['Preparado', 'En transito', 'Entregado'].includes(order.estado_pedido) ? 'bg-emerald-500/20 text-emerald-600' : 'bg-slate-200 text-slate-400'}`}>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-slate-800">Pago confirmado</div>
+                          <div className="text-xs text-slate-500 mt-0.5">Transferencia verificada por la farmacia</div>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${['Preparado', 'En transito', 'Entregado'].includes(order.estado_pedido) ? 'bg-emerald-500/20 text-emerald-600' : 'bg-slate-200 text-slate-400'}`}>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-slate-800">Preparación del pedido</div>
+                          <div className="text-xs text-slate-500 mt-0.5">La farmacia preparó tus productos</div>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${order.estado_pedido === 'En transito' || order.estado_pedido === 'Entregado' ? 'bg-emerald-500/20 text-emerald-600' : 'bg-slate-200 text-slate-400'}`}>
+                          {order.estado_pedido === 'En transito' || order.estado_pedido === 'Entregado' ? (
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <span className="text-xs font-bold">03</span>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-slate-800">Dron en camino</div>
+                          <div className="text-xs text-slate-500 mt-0.5">El dron está volando hacia tu ubicación</div>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${order.estado_pedido === 'Entregado' ? 'bg-emerald-500/20 text-emerald-600' : 'bg-slate-200 text-slate-400'}`}>
+                          {order.estado_pedido === 'Entregado' ? (
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <span className="text-xs font-bold">04</span>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-slate-800">Entregado</div>
+                          <div className="text-xs text-slate-500 mt-0.5">Productos entregados con éxito</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}

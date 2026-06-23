@@ -123,8 +123,12 @@ export default function PharmacyDashboardPage({ user }) {
           {profile ? (
             <div className="space-y-4">
               <div className="flex flex-col items-center">
-                <div className="w-28 h-28 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-4xl shadow-lg shadow-blue-500/20 mb-3">
-                  {profile.nombre_comercial?.charAt(0) || 'F'}
+                <div className="w-28 h-28 rounded-2xl bg-white border border-gray-100 flex items-center justify-center shadow-lg shadow-blue-500/10 mb-3 overflow-hidden">
+                  {profile.logo_url ? (
+                    <img src={profile.logo_url} alt={profile.nombre_comercial} className="w-full h-full object-contain p-2" />
+                  ) : (
+                    <span className="text-4xl font-bold bg-gradient-to-br from-sky-500 to-blue-600 bg-clip-text text-transparent">{profile.nombre_comercial?.charAt(0) || 'F'}</span>
+                  )}
                 </div>
                 <div className="text-lg font-bold text-gray-800">{profile.nombre_comercial}</div>
                 <div className="text-xs text-gray-500">{profile.ciudad}</div>

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { getFarmacias, getProductos, createPedido, createPago } from '../../api'
+import { getFarmacias, getProductos, createPedido, createPago, getDirecciones, createDireccion, deleteDireccion } from '../../api'
 import Badge from '../../components/ui/Badge'
 import LocationPicker from '../../components/maps/LocationPicker'
 import logo from '../../assets/Dron_Salud.png'
@@ -41,8 +41,12 @@ function InvoiceModal({ cart, profile, onClose, onPlaceOrder }) {
         <div className="p-6 space-y-6">
           {profile && (
             <div className="flex items-center gap-4 bg-gradient-to-br from-sky-50 to-blue-50 rounded-2xl p-4 border border-sky-100">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-xl shadow-md flex-shrink-0">
-                  {profile.nombre_comercial.charAt(0)}
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-xl shadow-md flex-shrink-0 overflow-hidden">
+                  {profile.logo_url ? (
+                    <img src={profile.logo_url} alt={profile.nombre_comercial} className="w-full h-full object-contain" />
+                  ) : (
+                    profile.nombre_comercial.charAt(0)
+                  )}
                 </div>
                 <div className="min-w-0">
                   <div className="text-base font-bold text-slate-800">{profile.nombre_comercial}</div>
@@ -196,9 +200,6 @@ function PaymentModal({ cart, profile, user, onSuccess, onBack }) {
   const [step, setStep] = useState('form')
   const [error, setError] = useState('')
 
-  const [mobileName, setMobileName] = useState('')
-  const [mobilePhone, setMobilePhone] = useState('')
-  const [mobileCI, setMobileCI] = useState('')
   const [mobileRef, setMobileRef] = useState('')
 
   const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.precio) * item.qty, 0)
@@ -217,9 +218,6 @@ function PaymentModal({ cart, profile, user, onSuccess, onBack }) {
     e.preventDefault()
     setError('')
 
-    if (!mobileName.trim()) { setError('Ingresa tu nombre'); return }
-    if (mobileCI.replace(/\D/g, '').length < 5) { setError('Cédula de identidad inválida'); return }
-    if (mobilePhone.replace(/\D/g, '').length < 7) { setError('Número telefónico inválido'); return }
     if (mobileRef.trim().length < 4) { setError('Número de referencia inválido'); return }
 
     setStep('processing')
@@ -267,15 +265,15 @@ function PaymentModal({ cart, profile, user, onSuccess, onBack }) {
           <div className="bg-gradient-to-br from-sky-50 to-blue-50 rounded-2xl p-5 border border-sky-100 text-left space-y-3 mb-5">
             <div className="flex items-center justify-between text-sm">
               <span className="text-slate-500">Nombre</span>
-              <span className="font-semibold text-slate-800">{mobileName || user?.nombre || '—'}</span>
+              <span className="font-semibold text-slate-800">{user?.nombre || '—'}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-slate-500">Cédula</span>
-              <span className="font-semibold text-slate-800 font-mono">{mobileCI || '—'}</span>
+              <span className="font-semibold text-slate-800 font-mono">{user?.cedula || '—'}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-slate-500">Teléfono</span>
-              <span className="font-semibold text-slate-800 font-mono">{mobilePhone || '—'}</span>
+              <span className="font-semibold text-slate-800 font-mono">{user?.telefono || '—'}</span>
             </div>
             <div className="border-t border-sky-100 pt-3 mt-3 flex items-center justify-between">
               <span className="text-slate-700 font-bold">Total pagado</span>
@@ -285,10 +283,10 @@ function PaymentModal({ cart, profile, user, onSuccess, onBack }) {
 
           <div className="space-y-2">
             <button
-              onClick={() => onSuccess({ mobileName, mobileCI, mobilePhone, mobileRef })}
+              onClick={() => onSuccess({ mobileRef })}
               className="w-full bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white font-bold py-3.5 rounded-2xl transition-all duration-200 shadow-lg shadow-blue-500/25 active:scale-[0.98]"
             >
-              Ver seguimiento del envío
+              Ver indicaciones del envío
             </button>
           </div>
         </div>
@@ -316,8 +314,12 @@ function PaymentModal({ cart, profile, user, onSuccess, onBack }) {
         <div className="p-6 space-y-6">
           <div className="bg-gradient-to-br from-sky-50 to-blue-50 rounded-2xl p-5 border border-sky-200">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
-                {profile?.nombre_comercial?.charAt(0) || 'F'}
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-md overflow-hidden">
+                {profile?.logo_url ? (
+                  <img src={profile.logo_url} alt={profile.nombre_comercial} className="w-full h-full object-contain" />
+                ) : (
+                  profile?.nombre_comercial?.charAt(0) || 'F'
+                )}
               </div>
               <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Transferir a {profile?.nombre_comercial || 'la farmacia'}</span>
             </div>
@@ -349,22 +351,6 @@ function PaymentModal({ cart, profile, user, onSuccess, onBack }) {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Nombre completo</label>
-              <input type="text" value={mobileName} onChange={e => setMobileName(e.target.value)} placeholder="Tu nombre" className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm bg-slate-50/50" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Cédula</label>
-                <input type="text" value={mobileCI} onChange={e => setMobileCI(e.target.value.replace(/\D/g, '').slice(0, 9))} placeholder="12345678" className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm font-mono bg-slate-50/50" />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Teléfono</label>
-                <input type="text" value={mobilePhone} onChange={e => setMobilePhone(e.target.value.replace(/\D/g, '').slice(0, 11))} placeholder="04121234567" className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm font-mono bg-slate-50/50" />
-              </div>
-            </div>
-
             <div>
               <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Referencia de transferencia</label>
               <input type="text" value={mobileRef} onChange={e => setMobileRef(e.target.value.slice(0, 20))} placeholder="Ingresa la referencia" className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm bg-slate-50/50" />
@@ -434,11 +420,11 @@ function DroneInstructions({ cart, profile, deliveryLocation, operator, user, pa
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sky-200">Cédula</span>
-              <span className="font-semibold text-white font-mono">{paymentInfo?.mobileCI || '—'}</span>
+              <span className="font-semibold text-white font-mono">{user?.cedula || '—'}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sky-200">Teléfono</span>
-              <span className="font-semibold text-white font-mono">{paymentInfo?.mobilePhone || '—'}</span>
+              <span className="font-semibold text-white font-mono">{user?.telefono || '—'}</span>
             </div>
             <div className="border-t border-white/10 pt-3 mt-3 flex items-center justify-between">
               <span className="text-sky-200 font-bold">Total pagado</span>
@@ -642,19 +628,6 @@ function ProductCard({ product, inCart, stockOk, onAdd }) {
   )
 }
 
-const STORAGE_KEY = 'dronSalud_savedLocations'
-
-function loadSavedLocations() {
-  try {
-    const data = localStorage.getItem(STORAGE_KEY)
-    return data ? JSON.parse(data) : []
-  } catch { return [] }
-}
-
-function saveLocationToStorage(locations) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(locations))
-}
-
 export default function NewOrderPage({ user }) {
   const [farmacias, setFarmacias] = useState([])
   const [selectedPharmacy, setSelectedPharmacy] = useState(null)
@@ -668,13 +641,27 @@ export default function NewOrderPage({ user }) {
   const [showDroneInstructions, setShowDroneInstructions] = useState(false)
   const [deliveryLocation, setDeliveryLocation] = useState(null)
   const [paymentInfo, setPaymentInfo] = useState({})
-  const [savedLocations, setSavedLocations] = useState(loadSavedLocations)
+  const [savedLocations, setSavedLocations] = useState([])
+  const operatorProfile = null
   const [searchQuery, setSearchQuery] = useState('')
   const [filterCategoria, setFilterCategoria] = useState('todos')
   const [cartOpen, setCartOpen] = useState(false)
 
   useEffect(() => {
     getFarmacias().then(setFarmacias).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    getDirecciones().then(data => {
+      const mapped = data.map(d => ({
+        id_direccion: d.id_direccion,
+        nombre: d.nombre_direccion,
+        direccion: d.direccion,
+        lat: Number(d.latitud),
+        lng: Number(d.longitud),
+      }))
+      setSavedLocations(mapped)
+    }).catch(() => setSavedLocations([]))
   }, [])
 
   useEffect(() => {
@@ -776,9 +763,20 @@ export default function NewOrderPage({ user }) {
         lat: location.lat,
         lng: location.lng,
       }
-      const updated = [...savedLocations, newLoc]
-      setSavedLocations(updated)
-      saveLocationToStorage(updated)
+      setSavedLocations(prev => [...prev, newLoc])
+      createDireccion({
+        nombre_direccion: newLoc.nombre,
+        direccion: newLoc.direccion,
+        latitud: String(newLoc.lat),
+        longitud: String(newLoc.lng),
+      }).then(saved => {
+        setSavedLocations(prev =>
+          prev.map(l => (l.lat === location.lat && l.lng === location.lng
+            ? { ...l, id_direccion: saved.id_direccion }
+            : l
+          ))
+        )
+      }).catch(() => {})
     }
     setShowPayment(true)
   }
@@ -816,6 +814,7 @@ export default function NewOrderPage({ user }) {
 
       await createPago({
         id_pedido: pedido.id_pedido,
+        id_cliente: user.id_usuario,
         id_farmacia: selectedPharmacy.id_farmacia,
         metodo: 'PagoMovil',
         monto: pedido.total,
@@ -839,9 +838,11 @@ export default function NewOrderPage({ user }) {
   }
 
   function handleDeleteLocation(index) {
-    const updated = savedLocations.filter((_, i) => i !== index)
-    setSavedLocations(updated)
-    saveLocationToStorage(updated)
+    const loc = savedLocations[index]
+    if (loc.id_direccion) {
+      deleteDireccion(loc.id_direccion).catch(() => {})
+    }
+    setSavedLocations(prev => prev.filter((_, i) => i !== index))
   }
 
   function backToShop() {
@@ -874,12 +875,20 @@ export default function NewOrderPage({ user }) {
               onClick={() => setSelectedPharmacy(p)}
               className="group relative bg-white rounded-3xl border border-slate-100 overflow-hidden hover:border-sky-200 hover:shadow-[0_12px_40px_rgba(14,165,233,0.12)] transition-all duration-500 text-left"
             >
-              <div className="h-48 bg-gradient-to-br from-sky-500 to-blue-600 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-sky-500/20 to-blue-600/20" />
+              <div className={`h-48 relative overflow-hidden ${p.foto_fachada_url ? '' : 'bg-gradient-to-br from-sky-500 to-blue-600'}`}>
+                {p.foto_fachada_url ? (
+                  <img src={p.foto_fachada_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-sky-500/20 to-blue-600/20" />
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent" />
                 <div className="absolute bottom-4 left-4 right-4 flex items-center gap-3">
                   <div className="w-14 h-14 rounded-2xl bg-white/90 backdrop-blur-md flex items-center justify-center shadow-lg flex-shrink-0 overflow-hidden">
-                    <span className="text-xl font-bold bg-gradient-to-br from-sky-600 to-blue-700 bg-clip-text text-transparent">{p.nombre_comercial.charAt(0)}</span>
+                    {p.logo_url ? (
+                      <img src={p.logo_url} alt={p.nombre_comercial} className="w-full h-full object-contain" />
+                    ) : (
+                      <span className="text-xl font-bold bg-gradient-to-br from-sky-600 to-blue-700 bg-clip-text text-transparent">{p.nombre_comercial.charAt(0)}</span>
+                    )}
                   </div>
                   <div className="text-white min-w-0">
                     <div className="text-base font-bold truncate">{p.nombre_comercial}</div>
@@ -932,8 +941,12 @@ export default function NewOrderPage({ user }) {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-50 to-blue-50 flex items-center justify-center text-blue-600 font-bold shrink-0">
-                  {profile.nombre_comercial.charAt(0)}
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-50 to-blue-50 flex items-center justify-center text-blue-600 font-bold shrink-0 overflow-hidden">
+                  {profile.logo_url ? (
+                    <img src={profile.logo_url} alt={profile.nombre_comercial} className="w-full h-full object-contain" />
+                  ) : (
+                    profile.nombre_comercial.charAt(0)
+                  )}
                 </div>
                 <div className="min-w-0">
                   <div className="text-sm font-bold text-slate-800 truncate">{profile.nombre_comercial}</div>
