@@ -58,7 +58,7 @@ export default function OrdersPage() {
       }
       if (filtroOperador) {
         const opName = order.operador
-          ? `${order.operador.nombre_operador || ''} ${order.operador.apellido || ''}`.trim()
+          ? `${order.operador.nombre_operador || order.operador.nombre || ''} ${order.operador.apellido || ''}`.trim()
           : order.despachador
             ? `${order.despachador.nombre || ''} ${order.despachador.apellido || ''}`.trim()
             : ''
@@ -131,7 +131,7 @@ export default function OrdersPage() {
                   pedidos
                     .flatMap(o => {
                       const names = []
-                      if (o.operador) names.push(`${o.operador.nombre_operador || ''} ${o.operador.apellido || ''}`.trim())
+                      if (o.operador) names.push(`${o.operador.nombre_operador || o.operador.nombre || ''} ${o.operador.apellido || ''}`.trim())
                       if (o.despachador) names.push(`${o.despachador.nombre || ''} ${o.despachador.apellido || ''}`.trim())
                       return names
                     })
@@ -186,7 +186,7 @@ export default function OrdersPage() {
                     <td className="py-3 pr-4"><Badge text={order.estado_pedido} /></td>
                     <td className="py-3 pr-4 text-gray-500 text-xs whitespace-nowrap">{order.fecha_creacion ? new Date(order.fecha_creacion).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                     <td className="py-3 pr-4 text-gray-600 font-medium">{order.dron?.modelo || order.dron?.nombre || (order.id_dron ? `#${order.id_dron}` : '—')}</td>
-                    <td className="py-3 text-gray-600 font-medium">{order.operador ? `${order.operador.nombre_operador || ''} ${order.operador.apellido || ''}`.trim() || `#${order.operador.id_operador}` : '—'}</td>
+                    <td className="py-3 text-gray-600 font-medium">{order.operador ? `${order.operador.nombre_operador || order.operador.nombre || ''} ${order.operador.apellido || ''}`.trim() || `#${order.operador.id_operador}` : '—'}</td>
                     <td className="py-3 text-gray-600 font-medium">{order.despachador ? `${order.despachador.nombre || ''} ${order.despachador.apellido || ''}`.trim() : '—'}</td>
                   </tr>
                 )))}
@@ -208,7 +208,7 @@ export default function OrdersPage() {
                   {order.operador && (
                     <div className="bg-gradient-to-br from-emerald-50/50 to-teal-50/50 rounded-xl px-4 py-3 border border-emerald-100/50 flex items-center gap-2">
                       <svg className="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                      <div><span className="text-gray-500 font-semibold">Operador:</span> <span className="text-gray-800 font-bold">{order.operador.nombre_operador || ''} {order.operador.apellido || ''}</span></div>
+                      <div><span className="text-gray-500 font-semibold">Operador:</span> <span className="text-gray-800 font-bold">{order.operador.nombre_operador || order.operador.nombre || ''} {order.operador.apellido || ''}</span></div>
                     </div>
                   )}
                   {order.despachador && (

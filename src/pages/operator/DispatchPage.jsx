@@ -83,6 +83,7 @@ export default function DispatchPage({ user }) {
       await asignarDronOperador(order.id_pedido, {
         id_dron: dronId,
         id_operador: user?.id_operador || null,
+        id_despachador: user?.id_usuario || user?.id_admin || null,
       })
       setPedidos(prev => prev.map(o =>
         o.id_pedido === order.id_pedido
@@ -198,7 +199,7 @@ export default function DispatchPage({ user }) {
                 </div>
               </div>
               <div className="rounded-2xl overflow-hidden border border-gray-200 h-[200px] sm:h-[290px]">
-                <iframe title="pharmacy-map" src={`https://maps.google.com/maps?q=${encodeURIComponent(profile.nombre_comercial + ', San Cristóbal, Táchira, Venezuela')}&z=16&output=embed`} width="100%" height="100%" style={{ border: 0 }} allowFullScreen loading="lazy" />
+                <iframe title="pharmacy-map" src={`https://maps.google.com/maps?q=${profile.lat && profile.lng ? `${profile.lat},${profile.lng}` : encodeURIComponent(profile.nombre_comercial + ', San Cristóbal, Táchira, Venezuela')}&z=16&output=embed`} width="100%" height="100%" style={{ border: 0 }} allowFullScreen loading="lazy" />
               </div>
             </div>
           </div>
