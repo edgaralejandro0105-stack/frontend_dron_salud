@@ -95,3 +95,39 @@ h1, h2, h3, h4, h5, h6 {
 .animate-progress {
   animation: progress 2.2s ease-in-out forwards;
 }
+
+@keyframes ping-soft {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+.animate-ping-soft {
+  animation: ping-soft 2s ease-out infinite;
+}
+
+@keyframes fade-in-up {
+  0% { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
+
+@keyframes scale-in {
+  0% { opacity: 0; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out forwards;
+}
+
+@keyframes drone-hover {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-4px) rotate(2deg); }
+}
+
+.animate-drone-hover {
+  animation: drone-hover 2.5s ease-in-out infinite;
+}

@@ -137,8 +137,8 @@ export default function OperatorHistoryPage() {
               )}
 
               <div className="text-xs text-gray-400 text-center pt-2 space-y-1">
-                {order.id_operador && <div>Operador ID: {order.id_operador}</div>}
-                {order.id_dron && <div>Dron ID: {order.id_dron}</div>}
+                {order.operador && <div>Operador: {order.operador.nombre_operador || ''} {order.operador.apellido || ''}</div>}
+                {order.dron && <div>Dron: {order.dron.modelo || order.dron.nombre || `#${order.dron.id_dron}`}</div>}
               </div>
             </div>
           ) : (

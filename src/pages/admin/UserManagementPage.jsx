@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { getOperadores, createOperador, updateOperador, removeOperador, getFarmacias, createFarmacia, updateFarmacia, removeFarmacia, register, getUsuarios, removeUsuario } from '../../api'
+import { getOperadores, createOperador, updateOperador, removeOperador, getFarmacias, createFarmacia, updateFarmacia, register, getUsuarios, updateUsuario, updateUsuarioEstado, getSuspensionesByUsuario, uploadFile } from '../../api'
 
 const CENTER = { lat: 7.8247, lng: -72.3082 }
 const TACHIRA_BOUNDS = L.latLngBounds(L.latLng(7.3, -72.6), L.latLng(8.5, -71.5))
@@ -53,7 +53,7 @@ export default function UserManagementPage() {
   const resolvingRef = useRef(false)
 
   const [opForm, setOpForm] = useState({
-    nombre: '', apellido: '', correo: '', cedula: '', licencia: '', horas_vuelo: '', telefono: '', vencimiento_licencia: ''
+    nombre: '', apellido: '', correo: '', cedula: '', licencia: '', horas_vuelo: '', telefono: '', vencimiento_licencia: '', foto_url: ''
   })
   const [farmForm, setFarmForm] = useState({
     nombre_comercial: '', rif: '', direccion: '', correo: '', telefono: '', telefono_responsable: '', ciudad: ''
@@ -73,6 +73,21 @@ export default function UserManagementPage() {
   const [adminForm, setAdminForm] = useState({
     nombre: '', apellido: '', cedula: '', email: '', password: '', telefono: ''
   })
+  const [opSuspendModal, setOpSuspendModal] = useState(null)
+  const [opSuspendReason, setOpSuspendReason] = useState('')
+  const [opSuspensionInfo, setOpSuspensionInfo] = useState(null)
+  const [suspendAdminModal, setSuspendAdminModal] = useState(null)
+  const [suspendAdminReason, setSuspendAdminReason] = useState('')
+  const [adminSuspensionInfo, setAdminSuspensionInfo] = useState(null)
+  const [farmSuspendModal, setFarmSuspendModal] = useState(null)
+  const [farmSuspendReason, setFarmSuspendReason] = useState('')
+  const [farmUsuariosMap, setFarmUsuariosMap] = useState({})
+  const [uploadingOpPhoto, setUploadingOpPhoto] = useState(false)
+  const [uploadingNewOpPhoto, setUploadingNewOpPhoto] = useState(false)
+  const [uploadingAdminPhoto, setUploadingAdminPhoto] = useState(false)
+  const opPhotoRef = useRef(null)
+  const newOpPhotoRef = useRef(null)
+  const adminPhotoRef = useRef(null)
 
   useEffect(() => {
     getOperadores().then(data => {
@@ -85,6 +100,12 @@ export default function UserManagementPage() {
     }).catch(() => {})
     getUsuarios('admin').then(data => {
       if (Array.isArray(data)) setAdmins(data)
+    }).catch(() => {})
+    getUsuarios('farmacia').then(data => {
+      const arr = Array.isArray(data) ? data : data?.usuarios || []
+      const map = {}
+      arr.forEach(u => { if (u.id_farmacia) map[u.id_farmacia] = u })
+      setFarmUsuariosMap(map)
     }).catch(() => {})
   }, [])
 
@@ -213,6 +234,97 @@ export default function UserManagementPage() {
       setMsg('Error: ' + (err?.response?.data?.message || 'Error al cambiar estado'))
     }
     setTimeout(() => setMsg(null), 4000)
+  }
+
+  function toggleFarmAccountStatus(farm) {
+    const u = farmUsuariosMap[farm.id_farmacia]
+    if (!u) { setMsg('Esta farmacia no tiene usuario asociado'); setTimeout(() => setMsg(null), 4000); return }
+    if (u.estado_cuenta === 'Suspendido') {
+      updateUsuarioEstado(u.id_usuario, 'Activo').then(() => {
+        setMsg('Farmacia activada correctamente')
+        getUsuarios('farmacia').then(data => {
+          const arr = Array.isArray(data) ? data : data?.usuarios || []
+          const map = {}; arr.forEach(u => { if (u.id_farmacia) map[u.id_farmacia] = u })
+          setFarmUsuariosMap(map)
+        }).catch(() => {})
+      }).catch(err => setMsg('Error: ' + (err?.response?.data?.message || 'Error al activar')))
+      setTimeout(() => setMsg(null), 4000)
+      return
+    }
+    setFarmSuspendModal({ ...farm, usuario: u })
+    setFarmSuspendReason('')
+  }
+
+  async function confirmSuspendFarm() {
+    if (!farmSuspendModal || !farmSuspendReason.trim()) return
+    try {
+      await updateUsuarioEstado(farmSuspendModal.usuario.id_usuario, 'Suspendido', farmSuspendReason.trim())
+      setMsg('Farmacia suspendida correctamente')
+      setFarmSuspendModal(null); setFarmSuspendReason('')
+      getUsuarios('farmacia').then(data => {
+        const arr = Array.isArray(data) ? data : data?.usuarios || []
+        const map = {}; arr.forEach(u => { if (u.id_farmacia) map[u.id_farmacia] = u })
+        setFarmUsuariosMap(map)
+      }).catch(() => {})
+    } catch (err) { setMsg('Error: ' + (err?.response?.data?.message || 'Error al suspender')) }
+    setTimeout(() => setMsg(null), 4000)
+  }
+
+  async function handleViewFarmSuspension(farm) {
+    const u = farmUsuariosMap[farm.id_farmacia]
+    if (!u) { setMsg('No tiene usuario asociado'); setTimeout(() => setMsg(null), 4000); return }
+    try { const data = await getSuspensionesByUsuario(u.id_usuario); setOpSuspensionInfo(data) }
+    catch { setMsg('Error al cargar suspensiones') }
+  }
+
+  function toggleOpAccountStatus(op) {
+    if (op.usuario?.estado_cuenta === 'Activo' || !op.usuario?.estado_cuenta) { setOpSuspendModal(op); setOpSuspendReason(''); return }
+    updateUsuarioEstado(op.id_usuario, 'Activo').then(() => {
+      setMsg('Operador activado correctamente')
+      getOperadores().then(data => setOperadores(Array.isArray(data) ? data : data?.operadores || [])).catch(() => {})
+    }).catch(err => setMsg('Error: ' + (err?.response?.data?.message || 'Error al activar')))
+    setTimeout(() => setMsg(null), 4000)
+  }
+
+  async function confirmSuspendOp() {
+    if (!opSuspendModal || !opSuspendReason.trim()) return
+    try {
+      await updateUsuarioEstado(opSuspendModal.id_usuario, 'Suspendido', opSuspendReason.trim())
+      setMsg('Operador suspendido correctamente')
+      setOpSuspendModal(null); setOpSuspendReason('')
+      getOperadores().then(data => setOperadores(Array.isArray(data) ? data : data?.operadores || [])).catch(() => {})
+    } catch (err) { setMsg('Error: ' + (err?.response?.data?.message || 'Error al suspender')) }
+    setTimeout(() => setMsg(null), 4000)
+  }
+
+  function toggleAdminStatus(u) {
+    if (u.estado_cuenta === 'Activo' || !u.estado_cuenta) { setSuspendAdminModal(u); setSuspendAdminReason(''); return }
+    updateUsuarioEstado(u.id_usuario, 'Activo').then(() => {
+      setMsg('Admin activado correctamente')
+      getUsuarios('admin').then(d => { if (Array.isArray(d)) setAdmins(d) }).catch(() => {})
+    }).catch(err => setMsg('Error: ' + (err?.response?.data?.message || 'Error al activar')))
+    setTimeout(() => setMsg(null), 4000)
+  }
+
+  async function confirmSuspendAdmin() {
+    if (!suspendAdminModal || !suspendAdminReason.trim()) return
+    try {
+      await updateUsuarioEstado(suspendAdminModal.id_usuario, 'Suspendido', suspendAdminReason.trim())
+      setMsg('Admin suspendido correctamente')
+      setSuspendAdminModal(null); setSuspendAdminReason('')
+      getUsuarios('admin').then(d => { if (Array.isArray(d)) setAdmins(d) }).catch(() => {})
+    } catch (err) { setMsg('Error: ' + (err?.response?.data?.message || 'Error al suspender')) }
+    setTimeout(() => setMsg(null), 4000)
+  }
+
+  async function handleViewOpSuspension(op) {
+    try { const data = await getSuspensionesByUsuario(op.id_usuario); setOpSuspensionInfo(data) }
+    catch { setMsg('Error al cargar suspensiones') }
+  }
+
+  async function handleViewAdminSuspension(u) {
+    try { const data = await getSuspensionesByUsuario(u.id_usuario); setAdminSuspensionInfo(data) }
+    catch { setMsg('Error al cargar suspensiones') }
   }
 
   function startEditOp(op) {
@@ -423,25 +535,37 @@ export default function UserManagementPage() {
               <table className="w-full text-sm">
                 <thead>
                     <tr className="text-xs font-semibold text-gray-500 uppercase tracking-widest border-b border-gray-100">
+                    <th className="text-left pb-3 pr-4 w-10"></th>
                     <th className="text-left pb-3 pr-4">Nombre</th>
                     <th className="text-left pb-3 pr-4">Email</th>
                     <th className="text-left pb-3 pr-4">Teléfono</th>
                     <th className="text-left pb-3 pr-4">Estado</th>
+                    <th className="text-left pb-3 pr-4">Cuenta</th>
                     <th className="text-left pb-3">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {operadores.length === 0 ? (
-                    <tr><td colSpan="5" className="py-8 text-center text-gray-400 text-sm">No hay operadores registrados</td></tr>
+                    <tr><td colSpan="7" className="py-8 text-center text-gray-400 text-sm">No hay operadores registrados</td></tr>
                   ) : (
                     operadores.map((op, i) => (
                       <tr key={op.id_operador} className="border-b border-gray-50">
+                        <td className="py-3 pr-4">
+                          <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden">
+                            {op.foto_url || op.usuario?.foto_url ? <img src={op.foto_url || op.usuario?.foto_url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400 text-[10px] font-bold">{op.nombre_operador?.charAt(0) || '?'}</div>}
+                          </div>
+                        </td>
                         <td className="py-3 pr-4 font-semibold text-gray-800">{op.nombre_operador}{op.apellido ? ' ' + op.apellido : ''}</td>
                         <td className="py-3 pr-4 text-gray-600">{op.email}</td>
                         <td className="py-3 pr-4 text-gray-600">{op.telefono || '—'}</td>
                         <td className="py-3 pr-4">
                           <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${op.estado_disponibilidad ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                            {op.estado_disponibilidad ? 'Activo' : 'Inactivo'}
+                            {op.estado_disponibilidad ? 'Disponible' : 'No disponible'}
+                          </span>
+                        </td>
+                        <td className="py-3 pr-4">
+                          <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${op.usuario?.estado_cuenta === 'Suspendido' ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                            {op.usuario?.estado_cuenta || 'Activo'}
                           </span>
                         </td>
                         <td className="py-3">
@@ -449,8 +573,11 @@ export default function UserManagementPage() {
                             <button onClick={() => startEditOp(op)} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Editar">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                             </button>
-                            <button onClick={() => toggleOpStatus(op)} className={`p-1.5 rounded-lg transition-all ${op.estado_disponibilidad ? 'text-gray-400 hover:text-red-600 hover:bg-red-50' : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'}`} title={op.estado_disponibilidad ? 'Deshabilitar' : 'Habilitar'}>
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={op.estado_disponibilidad ? 'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636' : 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'} /></svg>
+                            <button onClick={() => toggleOpAccountStatus(op)} className={`p-1.5 rounded-lg transition-all ${op.usuario?.estado_cuenta === 'Suspendido' ? 'text-red-500 hover:text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'}`} title={op.usuario?.estado_cuenta === 'Suspendido' ? 'Reactivar cuenta' : 'Suspender cuenta'}>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                            </button>
+                            <button onClick={() => handleViewOpSuspension(op)} className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-all" title="Historial suspensiones">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             </button>
                             <button onClick={() => requestDelete('operador', op)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all" title="Eliminar">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -516,6 +643,7 @@ export default function UserManagementPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-xs font-semibold text-gray-500 uppercase tracking-widest border-b border-gray-100">
+                  <th className="text-left pb-3 pr-4 w-10"></th>
                   <th className="text-left pb-3 pr-4">Nombre</th>
                   <th className="text-left pb-3 pr-4">Email</th>
                   <th className="text-left pb-3 pr-4">Teléfono</th>
@@ -525,10 +653,15 @@ export default function UserManagementPage() {
               </thead>
               <tbody>
                 {admins.length === 0 ? (
-                  <tr><td colSpan="5" className="py-8 text-center text-gray-400 text-sm">No hay administradores registrados</td></tr>
+                  <tr><td colSpan="6" className="py-8 text-center text-gray-400 text-sm">No hay administradores registrados</td></tr>
                 ) : (
                   admins.map(u => (
                     <tr key={u.id_usuario} className="border-b border-gray-50">
+                      <td className="py-3 pr-4">
+                        <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden">
+                          {u.foto_url ? <img src={u.foto_url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400 text-[10px] font-bold">{u.nombre?.charAt(0) || '?'}</div>}
+                        </div>
+                      </td>
                       <td className="py-3 pr-4 font-semibold text-gray-800">{u.nombre} {u.apellido || ''}</td>
                       <td className="py-3 pr-4 text-gray-600">{u.email}</td>
                       <td className="py-3 pr-4 text-gray-600">{u.telefono || '—'}</td>
@@ -538,9 +671,17 @@ export default function UserManagementPage() {
                         </span>
                       </td>
                       <td className="py-3">
-                        <button onClick={() => setConfirmDelete({ type: 'usuario', item: u })} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all" title="Eliminar">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
+                        <div className="flex gap-1.5">
+                          <button onClick={() => toggleAdminStatus(u)} className={`p-1.5 rounded-lg transition-all ${u.estado_cuenta === 'Suspendido' ? 'text-red-500 hover:text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'}`} title={u.estado_cuenta === 'Suspendido' ? 'Reactivar cuenta' : 'Suspender cuenta'}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                          </button>
+                          <button onClick={() => handleViewAdminSuspension(u)} className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-all" title="Historial suspensiones">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          </button>
+                          <button onClick={() => setConfirmDelete({ type: 'usuario', item: u })} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all" title="Eliminar">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -618,34 +759,54 @@ export default function UserManagementPage() {
               <table className="w-full text-sm">
                 <thead>
                     <tr className="text-xs font-semibold text-gray-500 uppercase tracking-widest border-b border-gray-100">
+                    <th className="text-left pb-3 pr-4 w-10"></th>
                     <th className="text-left pb-3 pr-4">Nombre</th>
                     <th className="text-left pb-3 pr-4">Email</th>
                     <th className="text-left pb-3 pr-4">Teléfono</th>
                     <th className="text-left pb-3 pr-4">Estado</th>
+                    <th className="text-left pb-3 pr-4">Cuenta</th>
                     <th className="text-left pb-3">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {farmacias.length === 0 ? (
-                    <tr><td colSpan="5" className="py-8 text-center text-gray-400 text-sm">No hay farmacias registradas</td></tr>
+                    <tr><td colSpan="7" className="py-8 text-center text-gray-400 text-sm">No hay farmacias registradas</td></tr>
                   ) : (
                     farmacias.map((p, i) => (
                       <tr key={p.id_farmacia} className="border-b border-gray-50">
+                        <td className="py-3 pr-4">
+                          <div className="w-8 h-8 rounded-lg bg-gray-200 overflow-hidden">
+                            {p.logo_url ? <img src={p.logo_url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400 text-[10px] font-bold">{p.nombre_comercial?.charAt(0) || '?'}</div>}
+                          </div>
+                        </td>
                         <td className="py-3 pr-4 font-semibold text-gray-800">{p.nombre_comercial}</td>
                         <td className="py-3 pr-4 text-gray-600">{p.email || '—'}</td>
                         <td className="py-3 pr-4 text-gray-600">{p.telefono || '—'}</td>
                         <td className="py-3 pr-4">
                           <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${p.estado_operativo ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                            {p.estado_operativo ? 'Activo' : 'Inactivo'}
+                            {p.estado_operativo ? 'Abierto' : 'Cerrado'}
                           </span>
+                        </td>
+                        <td className="py-3 pr-4">
+                          {(() => {
+                            const u = farmUsuariosMap[p.id_farmacia]
+                            const status = u?.estado_cuenta || '—'
+                            const color = status === 'Activo' ? 'bg-emerald-50 text-emerald-600' : status === 'Suspendido' ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-500'
+                            return <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${color}`}>{status}</span>
+                          })()}
                         </td>
                         <td className="py-3">
                           <div className="flex gap-1.5">
                             <button onClick={() => startEditFarm(p)} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Editar">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                             </button>
-                            <button onClick={() => toggleFarmStatus(p)} className={`p-1.5 rounded-lg transition-all ${p.estado_operativo ? 'text-gray-400 hover:text-red-600 hover:bg-red-50' : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'}`} title={p.estado_operativo ? 'Deshabilitar' : 'Habilitar'}>
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={p.estado_operativo ? 'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636' : 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'} /></svg>
+                            {farmUsuariosMap[p.id_farmacia] && (
+                              <button onClick={() => toggleFarmAccountStatus(p)} className={`p-1.5 rounded-lg transition-all ${farmUsuariosMap[p.id_farmacia]?.estado_cuenta === 'Suspendido' ? 'text-red-500 hover:text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'}`} title={farmUsuariosMap[p.id_farmacia]?.estado_cuenta === 'Suspendido' ? 'Reactivar cuenta' : 'Suspender cuenta'}>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                              </button>
+                            )}
+                            <button onClick={() => handleViewFarmSuspension(p)} className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-all" title="Historial suspensiones">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             </button>
                             <button onClick={() => requestDelete('farmacia', p)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all" title="Eliminar">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -759,6 +920,91 @@ export default function UserManagementPage() {
                 <button onClick={() => { setEditingFarm(null); setEditFarmMarkerPos(null) }} className="flex-1 py-3 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-all">Cancelar</button>
                 <button onClick={saveEditFarm} className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white font-bold text-sm shadow-lg shadow-emerald-500/25 hover:shadow-xl active:scale-[0.98] transition-all">Guardar cambios</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {opSuspendModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setOpSuspendModal(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-amber-50 flex items-center justify-center"><svg className="w-7 h-7 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg></div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Suspender operador</h3>
+              <p className="text-sm text-gray-500">¿Por qué se suspende a <strong>{opSuspendModal.nombre_operador} {opSuspendModal.apellido}</strong>?</p>
+            </div>
+            <textarea value={opSuspendReason} onChange={e => setOpSuspendReason(e.target.value)} placeholder="Describa el motivo..." rows={3} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 mb-6" required />
+            <div className="flex gap-3">
+              <button onClick={() => setOpSuspendModal(null)} className="flex-1 py-3 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50">Cancelar</button>
+              <button onClick={confirmSuspendOp} disabled={!opSuspendReason.trim()} className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-700 text-white font-bold text-sm shadow-lg shadow-amber-500/25 disabled:opacity-50">Suspender</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {opSuspensionInfo && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setOpSuspensionInfo(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6"><h3 className="text-lg font-bold text-gray-900">Historial de Suspensiones</h3><button onClick={() => setOpSuspensionInfo(null)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button></div>
+            {opSuspensionInfo.length === 0 ? <p className="text-center text-gray-400 py-4">Sin suspensiones</p> :
+              <div className="space-y-3">{opSuspensionInfo.map(s => (
+                <div key={s.id_suspension} className="bg-amber-50/50 rounded-xl p-4 border border-amber-100">
+                  <div className="flex items-center justify-between mb-2"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${s.fecha_activacion ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{s.fecha_activacion ? 'Reactivado' : 'Suspendido'}</span><span className="text-xs text-gray-400">{new Date(s.fecha_suspension).toLocaleDateString('es-ES', { day:'numeric', month:'short', year:'numeric' })}</span></div>
+                  {s.motivo && <p className="text-sm text-gray-700"><span className="font-semibold">Motivo:</span> {s.motivo}</p>}
+                  {s.suspendidoPor && <p className="text-xs text-gray-500">Por: {s.suspendidoPor.nombre} {s.suspendidoPor.apellido}</p>}
+                  {s.fecha_activacion && <p className="text-xs text-gray-500">Reactivado: {new Date(s.fecha_activacion).toLocaleDateString('es-ES', { day:'numeric', month:'short', year:'numeric' })}</p>}
+                </div>))}
+              </div>}
+          </div>
+        </div>
+      )}
+
+      {suspendAdminModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setSuspendAdminModal(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-amber-50 flex items-center justify-center"><svg className="w-7 h-7 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg></div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Suspender administrador</h3>
+              <p className="text-sm text-gray-500">¿Por qué se suspende a <strong>{suspendAdminModal.nombre} {suspendAdminModal.apellido}</strong>?</p>
+            </div>
+            <textarea value={suspendAdminReason} onChange={e => setSuspendAdminReason(e.target.value)} placeholder="Describa el motivo..." rows={3} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 mb-6" required />
+            <div className="flex gap-3">
+              <button onClick={() => setSuspendAdminModal(null)} className="flex-1 py-3 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50">Cancelar</button>
+              <button onClick={confirmSuspendAdmin} disabled={!suspendAdminReason.trim()} className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-700 text-white font-bold text-sm shadow-lg shadow-amber-500/25 disabled:opacity-50">Suspender</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {adminSuspensionInfo && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setAdminSuspensionInfo(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6"><h3 className="text-lg font-bold text-gray-900">Historial de Suspensiones</h3><button onClick={() => setAdminSuspensionInfo(null)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button></div>
+            {adminSuspensionInfo.length === 0 ? <p className="text-center text-gray-400 py-4">Sin suspensiones</p> :
+              <div className="space-y-3">{adminSuspensionInfo.map(s => (
+                <div key={s.id_suspension} className="bg-amber-50/50 rounded-xl p-4 border border-amber-100">
+                  <div className="flex items-center justify-between mb-2"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${s.fecha_activacion ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{s.fecha_activacion ? 'Reactivado' : 'Suspendido'}</span><span className="text-xs text-gray-400">{new Date(s.fecha_suspension).toLocaleDateString('es-ES', { day:'numeric', month:'short', year:'numeric' })}</span></div>
+                  {s.motivo && <p className="text-sm text-gray-700"><span className="font-semibold">Motivo:</span> {s.motivo}</p>}
+                  {s.suspendidoPor && <p className="text-xs text-gray-500">Por: {s.suspendidoPor.nombre} {s.suspendidoPor.apellido}</p>}
+                  {s.fecha_activacion && <p className="text-xs text-gray-500">Reactivado: {new Date(s.fecha_activacion).toLocaleDateString('es-ES', { day:'numeric', month:'short', year:'numeric' })}</p>}
+                </div>))}
+              </div>}
+          </div>
+        </div>
+      )}
+
+      {farmSuspendModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setFarmSuspendModal(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-amber-50 flex items-center justify-center"><svg className="w-7 h-7 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg></div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Suspender farmacia</h3>
+              <p className="text-sm text-gray-500">¿Por qué se suspende a <strong>{farmSuspendModal.nombre_comercial}</strong>?</p>
+            </div>
+            <textarea value={farmSuspendReason} onChange={e => setFarmSuspendReason(e.target.value)} placeholder="Describa el motivo..." rows={3} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 mb-6" required />
+            <div className="flex gap-3">
+              <button onClick={() => setFarmSuspendModal(null)} className="flex-1 py-3 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50">Cancelar</button>
+              <button onClick={confirmSuspendFarm} disabled={!farmSuspendReason.trim()} className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-700 text-white font-bold text-sm shadow-lg shadow-amber-500/25 disabled:opacity-50">Suspender</button>
             </div>
           </div>
         </div>

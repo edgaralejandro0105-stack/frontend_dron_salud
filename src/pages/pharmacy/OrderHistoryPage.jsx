@@ -27,8 +27,6 @@ export default function OrderHistoryPage({ user }) {
     ? pedidos.find(o => o.id_pedido === selected)
     : null
 
-  const client = null
-
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -94,9 +92,11 @@ export default function OrderHistoryPage({ user }) {
                   {(order.detalles || []).map((p, i) => (
                     <div key={i} className="flex items-center justify-between text-sm bg-gray-50 rounded-xl p-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-xs flex-shrink-0 font-bold text-gray-400">
-                          Rx
-                        </div>
+                        {p.producto?.foto_url ? (
+                          <img src={p.producto.foto_url} alt="" className="w-8 h-8 rounded-lg border border-gray-200 object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-xs flex-shrink-0 font-bold text-gray-400">Rx</div>
+                        )}
                         <div>
                           <div className="font-semibold text-gray-800">{p.nombre_producto}</div>
                           <div className="text-xs text-gray-500">x{p.cantidad}</div>
@@ -120,6 +120,16 @@ export default function OrderHistoryPage({ user }) {
                   <span className="text-gray-800">{formatCurrency(order.total)}</span>
                 </div>
               </div>
+
+              {order.cliente && (
+                <div className="bg-gray-50 rounded-2xl p-4">
+                  <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-2">Cliente</div>
+                  <div className="text-sm font-semibold text-gray-800">{order.cliente.nombre} {order.cliente.apellido}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{order.cliente.email}</div>
+                  {order.cliente.telefono && <div className="text-xs text-gray-500">{order.cliente.telefono}</div>}
+                  {order.cliente.cedula && <div className="text-xs text-gray-400 mt-1">C.I.: {order.cliente.cedula}</div>}
+                </div>
+              )}
 
               {(order.destino_nombre || order.destino_direccion) && (
                 <div className="bg-gray-50 rounded-2xl p-4">

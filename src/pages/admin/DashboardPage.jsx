@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState } from 'react'
-import { getPedidos, getDrones, getFarmacias } from '../../api'
+import { getPedidos, getDrones, getFarmacias, getUsuarios } from '../../api'
 import AreaChartSVG from '../../components/charts/AreaChart'
 import BarChartSVG from '../../components/charts/BarChart'
 import DonutChart from '../../components/charts/DonutChart'
@@ -31,10 +31,11 @@ const kpiCards = [
     format: (v) => v.toLocaleString(),
   },
   {
-    key: 'drones', label: 'Drones Activos',
-    gradient: 'from-amber-500 to-amber-600', shadow: 'shadow-amber-500/20',
+    key: 'drones', label: 'Drones',
+    gradient: 'from-sky-500 to-blue-600', shadow: 'shadow-sky-500/20',
     icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>),
-    format: (v, a) => `${a.activos} / ${a.totales}`,
+    format: (v, a) => `${a.disponibles} disp. · ${a.operativos} op.`,
+    badge: (v, a) => `${a.totales} totales`,
   },
   {
     key: 'farmacias', label: 'Farmacias',
@@ -54,16 +55,19 @@ export default function DashboardPage() {
   const [pedidos, setPedidos] = useState([])
   const [drones, setDrones] = useState([])
   const [farmacias, setFarmacias] = useState([])
+  const [usuarios, setUsuarios] = useState([])
 
   useEffect(() => {
-    Promise.all([getPedidos(), getDrones(), getFarmacias()])
-      .then(([p, d, f]) => {
+    Promise.all([getPedidos(), getDrones(), getFarmacias(), getUsuarios()])
+      .then(([p, d, f, u]) => {
         if (Array.isArray(p)) setPedidos(p)
         else if (p?.pedidos) setPedidos(p.pedidos)
         if (Array.isArray(d)) setDrones(d)
         else if (d?.drones) setDrones(d.drones)
         if (Array.isArray(f)) setFarmacias(f)
         else if (f?.farmacias) setFarmacias(f.farmacias)
+        if (Array.isArray(u)) setUsuarios(u)
+        else if (u?.usuarios) setUsuarios(u.usuarios)
       })
       .catch(() => {})
   }, [])
@@ -73,18 +77,18 @@ export default function DashboardPage() {
     const entregados = pedidos.filter(o => o.estado_pedido === 'Entregado').length
     const enTransito = pedidos.filter(o => o.estado_pedido === 'En transito').length
     const pendientes = pedidos.filter(o => o.estado_pedido === 'Pendiente' || o.estado_pedido === 'Pagado').length
-    const ingresos = pedidos.reduce((sum, o) => sum + Number(o.total), 0)
-    const enVuelo = drones.filter(d => d.estado_operativo === 'En vuelo').length
-    const disponibles = drones.filter(d => d.estado_operativo === 'Disponible').length
-    const clientesUnicos = new Set(pedidos.map(o => o.id_cliente)).size
-    return { total, entregados, enTransito, pendientes, ingresos, enVuelo, disponibles, clientesUnicos }
-  }, [pedidos, drones])
+    const ingresos = pedidos.reduce((sum, o) => sum + Number(o.cargo_dron || 0), 0)
+    const disponibles = drones.filter(d => d.estado_operativo === 'Activo').length
+    const operativos = drones.filter(d => d.estado_operativo !== 'Mantenimiento' && d.estado_operativo !== 'Cancelado').length
+    const clientesUnicos = usuarios.filter(u => u.tipo_usuario === 'cliente').length
+    return { total, entregados, enTransito, pendientes, ingresos, disponibles, operativos, clientesUnicos }
+  }, [pedidos, drones, usuarios])
 
   const kpiValues = useMemo(() => ({
     ingresos: stats.ingresos,
     pedidos: stats.total,
     entregados: stats.entregados,
-    drones: { activos: stats.disponibles, totales: drones.length, capacidad: drones.length > 0 ? Math.round((stats.disponibles / drones.length) * 100) : 0 },
+    drones: { disponibles: stats.disponibles, operativos: stats.operativos, totales: drones.length, capacidad: drones.length > 0 ? Math.round((stats.operativos / drones.length) * 100) : 0 },
     farmacias: farmacias.length,
     clientes: stats.clientesUnicos,
   }), [stats, drones, farmacias])
@@ -95,15 +99,20 @@ export default function DashboardPage() {
     { estado: 'Pendiente', valor: stats.pendientes, color: '#8B5CF6' },
   ], [stats])
 
+  const donutData = useMemo(() => ordenesPorEstado.filter(d => d.valor > 0), [ordenesPorEstado])
+
   const recentOrders = useMemo(() => {
     return [...pedidos].sort((a, b) => new Date(b.fecha_creacion) - new Date(a.fecha_creacion))
   }, [pedidos])
 
   const barData = useMemo(() => {
-    return farmacias.slice(0, 5).map(f => {
-      const count = pedidos.filter(p => p.id_farmacia === f.id_farmacia).length
-      return { nombre: f.nombre_comercial, pedidos: count }
-    })
+    return farmacias
+      .map(f => {
+        const count = pedidos.filter(p => p.id_farmacia === f.id_farmacia).length
+        return { nombre: f.nombre_comercial, pedidos: count }
+      })
+      .sort((a, b) => b.pedidos - a.pedidos)
+      .slice(0, 5)
   }, [farmacias, pedidos])
 
   const monthlyData = useMemo(() => {
@@ -114,7 +123,7 @@ export default function DashboardPage() {
       const key = d.toLocaleString('es-ES', { month: 'short', year: '2-digit' })
       months[key] = (months[key] || 0) + 1
     })
-    return Object.entries(months).slice(-6).map(([mes, envios]) => ({ mes, envios }))
+    return Object.entries(months).slice(-6).map(([mes, envios]) => ({ name: mes, envios }))
   }, [pedidos])
 
   const weeklyRevenue = pedidos
@@ -146,16 +155,35 @@ export default function DashboardPage() {
                     {card.icon}
                   </div>
                 </div>
-                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">{card.label}</div>
-                <div className="text-2xl font-bold text-gray-900 font-['Plus_Jakarta_Sans'] tracking-tight">{displayValue}</div>
-                <div className="mt-2 flex items-center gap-2">
-                  {card.key === 'ingresos' && weeklyValues.length > 0 && <Sparkline data={weeklyValues} color="#059669" />}
-                  <span className={`text-[11px] font-medium ${card.key === 'drones' ? 'text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full' : 'text-gray-400'}`}>{badgeText}</span>
-                </div>
-                {card.key === 'drones' && (
-                  <div className="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full animate-progress" style={{ width: `${value.capacidad}%` }} />
-                  </div>
+                {card.key === 'drones' ? (
+                  <>
+                    <div className="flex items-baseline gap-4">
+                      <div>
+                        <div className="text-[10px] text-gray-400 mb-0.5">Disponibles</div>
+                        <div className="text-xl text-gray-900 tracking-tight">{value.disponibles}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-gray-400 mb-0.5">Operativos</div>
+                        <div className="text-xl text-gray-900 tracking-tight">{value.operativos}</div>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between">
+                      <div className="text-[10px] text-gray-300">{value.totales} registrados</div>
+                      <span className="text-[10px] text-sky-600">{value.capacidad}% op.</span>
+                    </div>
+                    <div className="mt-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-sky-400 rounded-full" style={{ width: `${value.capacidad}%` }} />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">{card.label}</div>
+                    <div className="text-2xl font-bold text-gray-900 font-['Plus_Jakarta_Sans'] tracking-tight">{displayValue}</div>
+                    <div className="mt-2 flex items-center gap-2">
+                      {card.key === 'ingresos' && weeklyValues.length > 0 && <Sparkline data={weeklyValues} color="#059669" />}
+                      <span className="text-[11px] font-medium text-gray-400">{badgeText}</span>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -177,11 +205,11 @@ export default function DashboardPage() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 card-hover">
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">Estado de Pedidos</h3>
-            <span className="text-[11px] text-gray-400 font-medium">{ordenesPorEstado.reduce((s, d) => s + d.valor, 0)} total</span>
+            <span className="text-[11px] text-gray-400 font-medium">{stats.total} total</span>
           </div>
           <div className="flex items-center gap-6">
             <div className="w-[140px] h-[140px] flex-shrink-0">
-              <DonutChart data={ordenesPorEstado} size={160} innerRadius={0.55} />
+              <DonutChart data={donutData} size={160} innerRadius={0.55} />
             </div>
             <div className="flex-1 space-y-2.5">
               {ordenesPorEstado.map(d => (
@@ -205,7 +233,7 @@ export default function DashboardPage() {
             <span className="text-[11px] text-gray-400 font-medium">Top 5</span>
           </div>
           <div className="h-[240px]">
-            {barData.length > 0 ? <BarChartSVG data={barData} dataKey="pedidos" /> : <p className="text-gray-400 text-sm text-center pt-20">Sin datos</p>}
+            {barData.length > 0 ? <BarChartSVG data={barData} dataKey="pedidos" labelKey="nombre" /> : <p className="text-gray-400 text-sm text-center pt-20">Sin datos</p>}
           </div>
         </div>
 

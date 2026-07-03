@@ -174,9 +174,16 @@ export default function PurchaseHistoryPage({ user }) {
                   <div className="space-y-2">
                     {(order.detalles || []).map((p, i) => (
                       <div key={i} className="flex items-center justify-between text-sm bg-slate-50 rounded-xl p-3">
-                        <div>
-                          <div className="font-semibold text-slate-800">{p.nombre_producto}</div>
-                          <div className="text-xs text-slate-500">× {p.cantidad}</div>
+                        <div className="flex items-center gap-3">
+                          {p.producto?.foto_url ? (
+                            <img src={p.producto.foto_url} alt="" className="w-8 h-8 rounded-lg border border-gray-200 object-cover flex-shrink-0" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-xs flex-shrink-0 font-bold text-gray-400">Rx</div>
+                          )}
+                          <div>
+                            <div className="font-semibold text-slate-800">{p.nombre_producto}</div>
+                            <div className="text-xs text-slate-500">× {p.cantidad}</div>
+                          </div>
                         </div>
                         <div className="font-semibold text-slate-800">{formatCurrency(Number(p.precio_unitario) * p.cantidad)}</div>
                       </div>

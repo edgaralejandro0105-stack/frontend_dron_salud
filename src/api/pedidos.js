@@ -14,3 +14,6 @@ export const updateEstado = (id, estado_pedido) =>
 
 export const asignarDronOperador = (id, data) =>
   api.post(`/pedidos/${id}/asignar`, data).then(r => r.data)
+
+export const liberarPedido = (id) =>
+  api.post(`/pedidos/${id}/liberar`).then(r => r.data)

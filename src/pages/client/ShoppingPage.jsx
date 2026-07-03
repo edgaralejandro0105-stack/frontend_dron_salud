@@ -6,6 +6,7 @@ import PurchaseHistoryPage from './PurchaseHistoryPage'
 import SupportButton from '../../components/ui/SupportButton'
 import UserProfileCard from '../../components/ui/UserProfileCard'
 import Avatar from '../../components/ui/Avatar'
+import { getSuspensionesByUsuario } from '../../api'
 
 const tabs = [
   { key: 'shop', label: 'Nuevo Pedido' },
@@ -16,6 +17,7 @@ export default function ShoppingPage({ user, onLogout, onUpdateUser }) {
   const [showProfile, setShowProfile] = useState(false)
   const [activeTab, setActiveTab] = useState('shop')
   const [editProfileKey, setEditProfileKey] = useState(0)
+  const [suspensionModal, setSuspensionModal] = useState(null)
   const profileBtnRef = useRef(null)
 
   return (
@@ -114,6 +116,23 @@ export default function ShoppingPage({ user, onLogout, onUpdateUser }) {
                     Editar perfil
                   </button>
                   <button
+                    onClick={async () => {
+                      setShowProfile(false)
+                      try {
+                        const data = await getSuspensionesByUsuario(user.id_usuario)
+                        setSuspensionModal(data)
+                      } catch (err) {
+                        alert('Error al cargar informacion de la cuenta')
+                      }
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-all text-left"
+                  >
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Estado de cuenta
+                  </button>
+                  <button
                     onClick={onLogout}
                     className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 transition-all text-left"
                   >
@@ -152,6 +171,40 @@ export default function ShoppingPage({ user, onLogout, onUpdateUser }) {
         {activeTab === 'shop' && <NewOrderPage user={user} />}
         {activeTab === 'history' && <PurchaseHistoryPage user={user} />}
       </main>
+      {suspensionModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setSuspensionModal(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Estado de mi Cuenta</h3>
+              <button onClick={() => setSuspensionModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
+
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Historial de suspensiones</h4>
+            {suspensionModal.length === 0 ? (
+              <p className="text-center text-gray-400 py-4 text-sm">No has sido suspendido</p>
+            ) : (
+              <div className="space-y-3">
+                {suspensionModal.map(s => (
+                  <div key={s.id_suspension} className="bg-amber-50/50 rounded-xl p-4 border border-amber-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${s.fecha_activacion ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {s.fecha_activacion ? 'Reactivado' : 'Suspendido'}
+                      </span>
+                      <span className="text-xs text-gray-400">{new Date(s.fecha_suspension).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    {s.motivo && <p className="text-sm text-gray-700 mb-2"><span className="font-semibold">Motivo:</span> {s.motivo}</p>}
+                    {s.suspendidoPor && <p className="text-xs text-gray-500"><span className="font-semibold">Suspendido por:</span> {s.suspendidoPor.nombre} {s.suspendidoPor.apellido}</p>}
+                    {s.fecha_activacion && (
+                      <p className="text-xs text-gray-500 mt-1">Reactivado: {new Date(s.fecha_activacion).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <SupportButton />
       {editProfileKey > 0 && <UserProfileCard key={editProfileKey} profile={user} onUpdate={onUpdateUser} defaultOpen modalOnly />}
     </div>

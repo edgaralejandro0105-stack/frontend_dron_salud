@@ -9,8 +9,14 @@ export const getUsuario = (id) =>
 export const updateUsuario = (id, data) =>
   api.put(`/usuarios/${id}`, data).then(r => r.data)
 
-export const updateUsuarioEstado = (id, estado) =>
-  api.patch(`/usuarios/${id}/estado`, { estado }).then(r => r.data)
+export const updateUsuarioEstado = (id, estado, motivo_suspension = '') =>
+  api.patch(`/usuarios/${id}/estado`, { estado, motivo_suspension }).then(r => r.data)
 
 export const removeUsuario = (id) =>
   api.delete(`/usuarios/${id}`).then(r => r.data)
+
+export const getSuspensionesByUsuario = (id) =>
+  api.get(`/suspensiones/usuario/${id}`).then(r => r.data)
+
+export const getSuspensionActiva = (id) =>
+  api.get(`/suspensiones/usuario/${id}/activa`).then(r => r.data)

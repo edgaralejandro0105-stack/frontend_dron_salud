@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
-import { getPedidos, getDrones, getFarmacias, getOperadores } from '../../api'
+import { getPedidos, getDrones, getFarmacias } from '../../api'
+import AreaChartSVG from '../../components/charts/AreaChart'
 
 function formatCurrency(n) {
   const num = Number(n)
@@ -71,32 +72,73 @@ export default function ReportsPage() {
   const [drones, setDrones] = useState([])
   const [filtroDesde, setFiltroDesde] = useState('')
   const [filtroHasta, setFiltroHasta] = useState('')
+  const [filtroFarmacia, setFiltroFarmacia] = useState('')
+  const [farmacias, setFarmacias] = useState([])
   const [exportando, setExportando] = useState(false)
+  const [revenueView, setRevenueView] = useState('dia')
+  const [cargando, setCargando] = useState(false)
 
   useEffect(() => {
-    Promise.all([getPedidos(), getDrones(), getFarmacias(), getOperadores()])
-      .then(([p, d]) => {
-        if (Array.isArray(p)) setPedidos(p)
-        else if (p?.pedidos) setPedidos(p.pedidos)
+    let cancelled = false
+    setCargando(true)
+    const params = {}
+    if (filtroDesde) params.desde = filtroDesde
+    if (filtroHasta) params.hasta = filtroHasta
+    if (filtroFarmacia) params.id_farmacia = filtroFarmacia
+
+    getPedidos(params)
+      .then(p => {
+        if (!cancelled) {
+          if (Array.isArray(p)) setPedidos(p)
+          else if (p?.pedidos) setPedidos(p.pedidos)
+        }
+      })
+      .catch(err => {
+        if (!cancelled) console.error('Error al cargar datos del reporte:', err)
+      })
+      .finally(() => {
+        if (!cancelled) setCargando(false)
+      })
+
+    getDrones()
+      .then(d => {
+        if (!cancelled) {
+          if (Array.isArray(d)) setDrones(d)
+          else if (d?.drones) setDrones(d.drones)
+        }
+      })
+      .catch(err => {
+        if (!cancelled) console.error('Error al cargar drones:', err)
+      })
+
+    return () => { cancelled = true }
+  }, [filtroDesde, filtroHasta, filtroFarmacia])
+
+  useEffect(() => {
+    getDrones()
+      .then(d => {
         if (Array.isArray(d)) setDrones(d)
         else if (d?.drones) setDrones(d.drones)
       })
-      .catch(() => {})
+      .catch((err) => {
+        console.error('Error al cargar drones:', err)
+      })
+  }, [])
+
+  useEffect(() => {
+    getFarmacias()
+      .then(f => {
+        if (Array.isArray(f)) setFarmacias(f)
+        else if (f?.farmacias) setFarmacias(f.farmacias)
+      })
+      .catch(err => {
+        console.error('Error al cargar farmacias:', err)
+      })
   }, [])
 
   const filtered = useMemo(() => {
-    let items = [...pedidos]
-    if (filtroDesde) {
-      const d = new Date(filtroDesde)
-      items = items.filter(o => new Date(o.fecha_creacion) >= d)
-    }
-    if (filtroHasta) {
-      const d = new Date(filtroHasta)
-      d.setHours(23, 59, 59)
-      items = items.filter(o => new Date(o.fecha_creacion) <= d)
-    }
-    return items
-  }, [pedidos, filtroDesde, filtroHasta])
+    return [...pedidos]
+  }, [pedidos])
 
   const entregadosConTiempo = useMemo(() => {
     return filtered.filter(o => o.estado_pedido === 'Entregado' && o.timestamp_inicio && o.timestamp_fin)
@@ -108,6 +150,7 @@ export default function ReportsPage() {
     const entregados = filtered.filter(o => o.estado_pedido === 'Entregado')
     const enTransito = filtered.filter(o => o.estado_pedido === 'En transito')
     const asignados = filtered.filter(o => o.id_dron)
+    const tieneFiltro = !!(filtroDesde || filtroHasta)
 
     let tiempoPromedio = null, tiempoMin = null, tiempoMax = null
     if (entregadosConTiempo.length > 0) {
@@ -116,13 +159,6 @@ export default function ReportsPage() {
       tiempoMin = Math.round(Math.min(...tiempos))
       tiempoMax = Math.round(Math.max(...tiempos))
     }
-
-    const operadorCounts = {}
-    for (const o of asignados) {
-      const nombre = o.operador?.usuario ? `${o.operador.usuario.nombre} ${o.operador.usuario.apellido || ''}`.trim() : `#${o.id_operador || '?'}`
-      operadorCounts[nombre] = (operadorCounts[nombre] || 0) + 1
-    }
-    const topOperadores = Object.entries(operadorCounts).sort((a, b) => b[1] - a[1]).slice(0, 5)
 
     const dronCounts = {}
     for (const o of asignados) {
@@ -134,7 +170,109 @@ export default function ReportsPage() {
     const pedidosPorEstado = {}
     for (const o of filtered) pedidosPorEstado[o.estado_pedido] = (pedidosPorEstado[o.estado_pedido] || 0) + 1
 
-    const entregasHoy = entregados.filter(o => new Date(o.fecha_creacion).toDateString() === new Date().toDateString()).length
+    const ahora = new Date()
+    const allEntregados = filtered.filter(o => o.estado_pedido === 'Entregado')
+
+    let entregasHoy, entregadosHoyLabel, ingresosDiario, ingresosSemanal, ingresosMensual
+    let labelIngreso1, labelIngreso2, labelIngreso3
+    let revenueDaily = [], revenueWeekly = [], revenueMonthly = []
+
+    if (tieneFiltro) {
+      const desdeDate = filtroDesde ? new Date(filtroDesde + 'T00:00:00') : null
+      const hastaDate = filtroHasta ? new Date(filtroHasta + 'T23:59:59') : null
+
+      entregasHoy = entregados.length
+      entregadosHoyLabel = 'En el rango'
+
+      ingresosDiario = allEntregados.reduce((s, o) => s + Number(o.cargo_dron || 0), 0)
+      ingresosSemanal = allEntregados.length > 0
+        ? Math.round((ingresosDiario / allEntregados.length) * 100) / 100
+        : 0
+      ingresosMensual = allEntregados.length
+
+      labelIngreso1 = filtroDesde && filtroHasta
+        ? `${new Date(filtroDesde + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} - ${new Date(filtroHasta + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`
+        : 'Rango'
+      labelIngreso2 = 'Prom. x entrega'
+      labelIngreso3 = 'Total entregas'
+
+      const dInicio = desdeDate ? new Date(desdeDate) : (hastaDate ? new Date(hastaDate.getTime() - 6 * 86400000) : new Date(ahora))
+      dInicio.setHours(0, 0, 0, 0)
+      const dFin = hastaDate ? new Date(hastaDate) : (desdeDate ? new Date(desdeDate.getTime() + 6 * 86400000) : new Date())
+      dFin.setHours(0, 0, 0, 0)
+
+      const dailyTotals = {}
+      allEntregados.forEach(o => {
+        const dia = o.fecha_creacion ? o.fecha_creacion.substring(0, 10) : ''
+        if (dia) dailyTotals[dia] = (dailyTotals[dia] || 0) + Number(o.cargo_dron || 0)
+      })
+
+      let current = new Date(dInicio)
+      while (current <= dFin && revenueDaily.length < 31) {
+        const diaStr = current.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+        const iso = current.toISOString().substring(0, 10)
+        revenueDaily.push({ label: diaStr, value: dailyTotals[iso] || 0 })
+        current = new Date(current.getFullYear(), current.getMonth(), current.getDate() + 1)
+      }
+    } else {
+      const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate())
+      const inicioSemana = new Date(ahora)
+      inicioSemana.setDate(ahora.getDate() - ahora.getDay())
+      inicioSemana.setHours(0, 0, 0, 0)
+      const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1)
+
+      entregasHoy = entregados.filter(o => new Date(o.fecha_creacion).toDateString() === new Date().toDateString()).length
+      entregadosHoyLabel = 'hoy'
+
+      ingresosDiario = allEntregados.filter(o => new Date(o.fecha_creacion) >= inicioDia).reduce((s, o) => s + Number(o.cargo_dron || 0), 0)
+      ingresosSemanal = allEntregados.filter(o => new Date(o.fecha_creacion) >= inicioSemana).reduce((s, o) => s + Number(o.cargo_dron || 0), 0)
+      ingresosMensual = allEntregados.filter(o => new Date(o.fecha_creacion) >= inicioMes).reduce((s, o) => s + Number(o.cargo_dron || 0), 0)
+      labelIngreso1 = 'Hoy'
+      labelIngreso2 = 'Esta semana'
+      labelIngreso3 = 'Este mes'
+
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(ahora)
+        d.setDate(ahora.getDate() - i)
+        const diaStr = d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' })
+        const fechaInicio = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+        const fechaFin = new Date(fechaInicio)
+        fechaFin.setDate(fechaFin.getDate() + 1)
+        const total = allEntregados.filter(o => {
+          const fc = new Date(o.fecha_creacion)
+          return fc >= fechaInicio && fc < fechaFin
+        }).reduce((s, o) => s + Number(o.cargo_dron || 0), 0)
+        revenueDaily.push({ label: diaStr, value: total })
+      }
+
+      for (let i = 3; i >= 0; i--) {
+        const d = new Date(ahora)
+        d.setDate(ahora.getDate() - (i * 7))
+        const inicioSem = new Date(d)
+        inicioSem.setDate(d.getDate() - d.getDay())
+        inicioSem.setHours(0, 0, 0, 0)
+        const finSem = new Date(inicioSem)
+        finSem.setDate(finSem.getDate() + 7)
+        const label = `${inicioSem.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`
+        const total = allEntregados.filter(o => {
+          const fc = new Date(o.fecha_creacion)
+          return fc >= inicioSem && fc < finSem
+        }).reduce((s, o) => s + Number(o.cargo_dron || 0), 0)
+        revenueWeekly.push({ label, value: total })
+      }
+
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(ahora.getFullYear(), ahora.getMonth() - i, 1)
+        const inicioM = new Date(d)
+        const finM = new Date(d.getFullYear(), d.getMonth() + 1, 1)
+        const label = inicioM.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })
+        const total = allEntregados.filter(o => {
+          const fc = new Date(o.fecha_creacion)
+          return fc >= inicioM && fc < finM
+        }).reduce((s, o) => s + Number(o.cargo_dron || 0), 0)
+        revenueMonthly.push({ label, value: total })
+      }
+    }
 
     const activos = drones.filter(d => d.estado_operativo === 'Activo' || d.estado_operativo === 'Transito').length
     const dronUtilizacion = drones.length > 0 ? Math.round((activos / drones.length) * 100) : 0
@@ -153,14 +291,18 @@ export default function ReportsPage() {
       totalAsignados: asignados.length,
       totalEntregados: entregados.length,
       entregadosHoy: entregasHoy,
+      entregadosHoyLabel,
       enTransito: enTransito.length,
       tasaExito: filtered.length > 0 ? Math.round((entregados.length / filtered.length) * 100) : 0,
       tiempoPromedio, tiempoMin, tiempoMax,
-      topOperadores, topDrones,
+      topDrones,
       pedidosPorEstado, dronUtilizacion,
-      tiemposRangos
+      tiemposRangos, ingresosDiario, ingresosSemanal, ingresosMensual,
+      labelIngreso1, labelIngreso2, labelIngreso3,
+      tieneFiltro,
+      revenueDaily, revenueWeekly, revenueMonthly
     }
-  }, [filtered, drones, entregadosConTiempo])
+  }, [filtered, drones, entregadosConTiempo, filtroDesde, filtroHasta])
 
   const donutSegments = useMemo(() => {
     const map = {
@@ -203,6 +345,30 @@ export default function ReportsPage() {
             <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1">Hasta</label>
             <input type="date" value={filtroHasta} onChange={e => setFiltroHasta(e.target.value)} className="bg-gray-50 border border-gray-200 text-gray-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500" />
           </div>
+          <div>
+            <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1">Farmacia</label>
+            <select
+              value={filtroFarmacia}
+              onChange={e => setFiltroFarmacia(e.target.value)}
+              className="bg-gray-50 border border-gray-200 text-gray-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+            >
+              <option value="">Todas</option>
+              {farmacias.map(f => (
+                <option key={f.id_farmacia} value={f.id_farmacia}>{f.nombre_comercial}</option>
+              ))}
+            </select>
+          </div>
+          {(filtroDesde || filtroHasta || filtroFarmacia) && (
+            <button
+              onClick={() => { setFiltroDesde(''); setFiltroHasta(''); setFiltroFarmacia('') }}
+              className="flex items-center gap-1 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.97]"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Limpiar
+            </button>
+          )}
           <button
             onClick={handleExport}
             disabled={exportando}
@@ -215,6 +381,12 @@ export default function ReportsPage() {
           </button>
         </div>
       </div>
+
+      {cargando && (
+        <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500 animate-pulse rounded-full" style={{ width: '100%' }} />
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
@@ -229,7 +401,7 @@ export default function ReportsPage() {
           value={stats.totalEntregados}
           label="Entregas completadas"
           badge={`${stats.tasaExito}%`}
-          sub={`${stats.entregadosHoy} hoy`}
+          sub={`${stats.entregadosHoy} ${stats.entregadosHoyLabel}`}
           color="from-emerald-500 to-emerald-600"
         />
         <StatCard
@@ -244,36 +416,20 @@ export default function ReportsPage() {
           value={`${stats.dronUtilizacion}%`}
           label="Utilización de flota"
           sub={`${drones.length} drones registrados`}
-          color="from-amber-500 to-orange-600"
+          color="from-sky-500 to-blue-600"
         />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 grid gap-6">
-          <div className="grid gap-6 sm:grid-cols-2">
-            <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-[0_4px_24px_rgb(0,0,0,0.04)]">
-              <h3 className="text-sm font-bold text-gray-900 mb-5 font-['Plus_Jakarta_Sans']">Top Operadores</h3>
-              <div className="space-y-3">
-                {stats.topOperadores.length > 0 ? stats.topOperadores.map(([nombre, count], i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center text-xs font-bold text-indigo-600 shrink-0">
-                      {i + 1}
-                    </div>
-                    <MiniBar label={nombre} value={count} max={stats.topOperadores[0]?.[1] || 1} color="bg-gradient-to-r from-indigo-400 to-violet-500" />
-                  </div>
-                )) : <p className="text-sm text-gray-400 text-center py-6">Sin datos</p>}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-[0_4px_24px_rgb(0,0,0,0.04)]">
+          <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-[0_4px_24px_rgb(0,0,0,0.04)]">
               <h3 className="text-sm font-bold text-gray-900 mb-5 font-['Plus_Jakarta_Sans']">Top Drones</h3>
               <div className="space-y-3">
                 {stats.topDrones.length > 0 ? stats.topDrones.map(([modelo, count], i) => (
-                  <MiniBar key={i} label={modelo} value={count} max={stats.topDrones[0]?.[1] || 1} color="bg-gradient-to-r from-amber-400 to-orange-500" />
+                  <MiniBar key={i} label={modelo} value={count} max={stats.topDrones[0]?.[1] || 1} color="bg-gradient-to-r from-sky-400 to-blue-500" />
                 )) : <p className="text-sm text-gray-400 text-center py-6">Sin datos</p>}
               </div>
             </div>
-          </div>
 
           <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-[0_4px_24px_rgb(0,0,0,0.04)]">
             <div className="flex items-center justify-between mb-5">
@@ -309,24 +465,61 @@ export default function ReportsPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 rounded-3xl p-6 text-white shadow-xl">
+          <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-[0_4px_24px_rgb(0,0,0,0.04)]">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-semibold uppercase tracking-widest opacity-80">Hoy</h3>
-              <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center backdrop-blur-sm">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
+              <h3 className="text-sm font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Ingresos por Envíos</h3>
+              {!stats.tieneFiltro && (
+                <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-xl">
+                  {['dia', 'semana', 'mes'].map(v => (
+                    <button key={v} onClick={() => setRevenueView(v)} className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${revenueView === v ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                      {v === 'dia' ? 'Día' : v === 'semana' ? 'Semana' : 'Mes'}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="h-[200px]">
+              <AreaChartSVG
+                data={revenueView === 'dia' ? stats.revenueDaily : revenueView === 'semana' ? stats.revenueWeekly : stats.revenueMonthly}
+                dataKey="value"
+                color="#059669"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-gray-100">
+              <div className="text-center">
+                <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">{stats.labelIngreso1}</div>
+                <div className="text-sm font-bold text-emerald-600">{formatCurrency(stats.ingresosDiario)}</div>
+              </div>
+              <div className="text-center">
+                <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">{stats.labelIngreso2}</div>
+                <div className="text-sm font-bold text-emerald-600">{formatCurrency(stats.ingresosSemanal)}</div>
+              </div>
+              <div className="text-center">
+                <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">{stats.labelIngreso3}</div>
+                <div className="text-sm font-bold text-emerald-600">{stats.tieneFiltro ? stats.ingresosMensual : formatCurrency(stats.ingresosMensual)}</div>
               </div>
             </div>
-            <div className="text-4xl font-bold mb-1">{stats.entregadosHoy}</div>
-            <div className="text-sm opacity-80">entregas realizadas</div>
-            <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between text-sm">
-              <span className="opacity-70">En tránsito</span>
-              <span className="font-bold">{stats.enTransito}</span>
-            </div>
-            <div className="mt-2 flex items-center justify-between text-sm">
-              <span className="opacity-70">Tasa de éxito</span>
-              <span className="font-bold">{stats.tasaExito}%</span>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-[0_4px_24px_rgb(0,0,0,0.04)]">
+            <h3 className="text-sm font-bold text-gray-900 mb-5 font-['Plus_Jakarta_Sans']">Resumen de Entregas</h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between py-2 border-b border-gray-50">
+                <span className="text-sm text-gray-600">Entregas {stats.entregadosHoyLabel}</span>
+                <span className="text-sm font-bold text-emerald-600">{stats.entregadosHoy}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-gray-50">
+                <span className="text-sm text-gray-600">En tránsito</span>
+                <span className="text-sm font-bold text-blue-600">{stats.enTransito}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-gray-50">
+                <span className="text-sm text-gray-600">Tasa de éxito</span>
+                <span className="text-sm font-bold text-violet-600">{stats.tasaExito}%</span>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-sm text-gray-600">Utilización flota</span>
+                <span className="text-sm font-bold text-sky-600">{stats.dronUtilizacion}%</span>
+              </div>
             </div>
           </div>
 

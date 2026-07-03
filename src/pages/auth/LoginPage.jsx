@@ -3,6 +3,7 @@ import { login } from '../../api'
 import logo from '../../assets/Dron_Salud.png'
 import SupportButton from '../../components/ui/SupportButton'
 import DroneDelivery from '../../components/ui/DroneDelivery'
+import SuspendedScreen from '../../components/ui/SuspendedScreen'
 
 function InputField({ label, type = 'text', placeholder = '', icon = null, value, onChange, name }) {
   return (
@@ -65,6 +66,8 @@ export default function LoginPage({ onCreateAccount, onLoginSuccess }) {
   const [remember, setRemember] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [suspended, setSuspended] = useState(false)
+  const [suspendedMsg, setSuspendedMsg] = useState('')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -78,6 +81,12 @@ export default function LoginPage({ onCreateAccount, onLoginSuccess }) {
     setLoading(true)
     try {
       const data = await login(email.trim(), password)
+      if (data.suspended) {
+        setLoading(false)
+        setSuspendedMsg(data.message || 'Tu cuenta ha sido suspendida.')
+        setSuspended(true)
+        return
+      }
       localStorage.setItem('token', data.token)
       localStorage.setItem('user', JSON.stringify(data.usuario))
       const user = {
@@ -91,7 +100,13 @@ export default function LoginPage({ onCreateAccount, onLoginSuccess }) {
       }, 500)
     } catch (err) {
       setLoading(false)
-      setError(err.response?.data?.message || err.response?.data?.error || 'Correo o contraseña incorrectos.')
+      const serverMsg = err.response?.data?.message || err.response?.data?.error || ''
+      if (serverMsg.toLowerCase().includes('suspendida') || serverMsg.toLowerCase().includes('suspendido') || serverMsg.toLowerCase().includes('desactivada')) {
+        setSuspendedMsg(serverMsg)
+        setSuspended(true)
+      } else {
+        setError(serverMsg || 'Correo o contraseña incorrectos.')
+      }
     }
   }
 
@@ -108,7 +123,15 @@ export default function LoginPage({ onCreateAccount, onLoginSuccess }) {
   }
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-[#081428] via-[#0c1f42] to-[#112a50] overflow-hidden">
+    <>
+      {suspended && (
+        <SuspendedScreen
+          message={suspendedMsg}
+          onClose={() => { setSuspended(false); setSuspendedMsg('') }}
+        />
+      )}
+
+      <div className="min-h-screen flex bg-gradient-to-br from-[#081428] via-[#0c1f42] to-[#112a50] overflow-hidden">
       <div className="flex-1 hidden lg:flex flex-col items-center justify-center relative">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -top-40 -left-40 w-80 h-80 bg-sky-500/15 rounded-full blur-3xl animate-pulse-soft" />
@@ -117,7 +140,9 @@ export default function LoginPage({ onCreateAccount, onLoginSuccess }) {
         </div>
 
           <div className="relative z-10 text-center">
-            <DroneDelivery />
+            <div className="animate-float mb-6">
+              <DroneDelivery />
+            </div>
           <h1 className="text-4xl font-bold text-white font-['Plus_Jakarta_Sans'] mb-3">
             Dron<span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-blue-400">Salud</span>
           </h1>
@@ -132,7 +157,11 @@ export default function LoginPage({ onCreateAccount, onLoginSuccess }) {
         <div className="relative z-10 w-full max-w-md animate-fade-in-up">
           <div className="bg-white/90 backdrop-blur-2xl rounded-3xl shadow-2xl shadow-indigo-500/10 border border-white/20 p-8 md:p-10">
             <div className="lg:hidden flex flex-col items-center mb-8">
-              <img src={logo} alt="Dron Salud" className="w-40 h-40 object-contain mb-4" />
+              <div className="animate-float mb-4">
+                <div className="w-32 h-32 mx-auto bg-gradient-to-br from-sky-500/20 to-blue-500/20 rounded-3xl p-4 border border-white/10 backdrop-blur-xl shadow-2xl">
+                  <img src={logo} alt="Dron Salud" className="w-full h-full object-contain" />
+                </div>
+              </div>
               <h2 className="text-xl font-bold text-gray-900 font-['Plus_Jakarta_Sans']">
                 Dron<span className="text-blue-600">Salud</span>
               </h2>
@@ -211,5 +240,6 @@ export default function LoginPage({ onCreateAccount, onLoginSuccess }) {
       </div>
       <SupportButton />
     </div>
+    </>
   )
 }

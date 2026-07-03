@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getUsuarios, updateUsuario, updateUsuarioEstado, register, removeUsuario } from '../../api'
+import { getUsuarios, updateUsuario, updateUsuarioEstado, register, removeUsuario, getSuspensionesByUsuario } from '../../api'
 import Avatar from '../../components/ui/Avatar'
 
 const inputClass = 'w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 focus:bg-white transition-all duration-200 text-sm'
@@ -12,6 +12,9 @@ export default function ClientsPage() {
   const [editingCliente, setEditingCliente] = useState(null)
   const [editForm, setEditForm] = useState({})
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [suspendModal, setSuspendModal] = useState(null)
+  const [suspendReason, setSuspendReason] = useState('')
+  const [suspensionInfo, setSuspensionInfo] = useState(null)
 
   const [registerForm, setRegisterForm] = useState({
     nombre: '', apellido: '', cedula: '', email: '', password: '', confirmPassword: '', telefono: ''
@@ -95,14 +98,38 @@ export default function ClientsPage() {
   }
 
   async function toggleStatus(u) {
-    const nuevoEstado = u.estado_cuenta === 'Activo' ? 'Suspendido' : 'Activo'
+    if (u.estado_cuenta === 'Activo') {
+      setSuspendModal(u)
+      setSuspendReason('')
+      return
+    }
     try {
-      await updateUsuarioEstado(u.id_usuario, nuevoEstado)
-      showMsg(`Cliente ${nuevoEstado === 'Activo' ? 'activado' : 'suspendido'} correctamente`)
+      await updateUsuarioEstado(u.id_usuario, 'Activo')
+      showMsg('Cliente activado correctamente')
       loadClientes()
     } catch (err) {
       showMsg('Error: ' + (err?.response?.data?.message || 'Error al cambiar estado'))
     }
+  }
+
+  async function confirmSuspend() {
+    if (!suspendModal || !suspendReason.trim()) return
+    try {
+      await updateUsuarioEstado(suspendModal.id_usuario, 'Suspendido', suspendReason.trim())
+      showMsg('Cliente suspendido correctamente')
+      setSuspendModal(null)
+      setSuspendReason('')
+      loadClientes()
+    } catch (err) {
+      showMsg('Error: ' + (err?.response?.data?.message || 'Error al suspender'))
+    }
+  }
+
+  async function handleViewSuspension(u) {
+    try {
+      const data = await getSuspensionesByUsuario(u.id_usuario)
+      setSuspensionInfo(data)
+    } catch { showMsg('Error al cargar suspensiones') }
   }
 
   return (
@@ -222,6 +249,9 @@ export default function ClientsPage() {
                         <button onClick={() => toggleStatus(u)} className={`p-1.5 rounded-lg transition-all ${u.estado_cuenta === 'Activo' ? 'text-gray-400 hover:text-red-600 hover:bg-red-50' : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'}`} title={u.estado_cuenta === 'Activo' ? 'Suspender' : 'Activar'}>
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={u.estado_cuenta === 'Activo' ? 'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636' : 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'} /></svg>
                         </button>
+                        <button onClick={() => handleViewSuspension(u)} className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-all" title="Historial suspensiones">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </button>
                         <button onClick={() => setConfirmDelete(u)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all" title="Eliminar">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                         </button>
@@ -282,6 +312,34 @@ export default function ClientsPage() {
           </div>
         </div>
       )}
+
+      {suspendModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setSuspendModal(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="text-center mb-6"><div className="w-14 h-14 mx-auto mb-4 rounded-full bg-amber-50 flex items-center justify-center"><svg className="w-7 h-7 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg></div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Suspender cliente</h3><p className="text-sm text-gray-500">¿Por qué se suspende a <strong>{suspendModal.nombre} {suspendModal.apellido}</strong>?</p></div>
+            <textarea value={suspendReason} onChange={e => setSuspendReason(e.target.value)} placeholder="Describa el motivo..." rows={3} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-200 mb-6" required />
+            <div className="flex gap-3"><button onClick={() => setSuspendModal(null)} className="flex-1 py-3 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50">Cancelar</button>
+              <button onClick={confirmSuspend} disabled={!suspendReason.trim()} className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-700 text-white font-bold text-sm shadow-lg shadow-amber-500/25 disabled:opacity-50">Suspender</button></div>
+          </div>
+        </div>
+      )}
+
+      {suspensionInfo && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setSuspensionInfo(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6"><h3 className="text-lg font-bold text-gray-900">Historial de Suspensiones</h3><button onClick={() => setSuspensionInfo(null)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button></div>
+            {suspensionInfo.length === 0 ? <p className="text-center text-gray-400 py-4">Sin suspensiones</p> : <div className="space-y-3">{suspensionInfo.map(s => (
+              <div key={s.id_suspension} className="bg-amber-50/50 rounded-xl p-4 border border-amber-100">
+                <div className="flex items-center justify-between mb-2"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${s.fecha_activacion ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{s.fecha_activacion ? 'Reactivado' : 'Suspendido'}</span><span className="text-xs text-gray-400">{new Date(s.fecha_suspension).toLocaleDateString('es-ES', { day:'numeric', month:'short', year:'numeric' })}</span></div>
+                {s.motivo && <p className="text-sm text-gray-700"><span className="font-semibold">Motivo:</span> {s.motivo}</p>}
+                {s.suspendidoPor && <p className="text-xs text-gray-500">Por: {s.suspendidoPor.nombre} {s.suspendidoPor.apellido}</p>}
+                {s.fecha_activacion && <p className="text-xs text-gray-500">Reactivado: {new Date(s.fecha_activacion).toLocaleDateString('es-ES', { day:'numeric', month:'short', year:'numeric' })}</p>}
+              </div>))}</div>}
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { getPedidos, getFarmacias } from '../../api'
+import { getPedidos, getFarmacias, getOperadores } from '../../api'
 import Badge from '../../components/ui/Badge'
 
 function formatCurrency(n) {
@@ -15,35 +15,58 @@ export default function OrdersPage() {
   const [filtroFarmacia, setFiltroFarmacia] = useState('')
   const [pedidos, setPedidos] = useState([])
   const [farmacias, setFarmacias] = useState([])
+  const [operadores, setOperadores] = useState([])
+  const [filtroOperador, setFiltroOperador] = useState('')
+
+  const [cargando, setCargando] = useState(false)
 
   useEffect(() => {
-    Promise.all([getPedidos(), getFarmacias()])
-      .then(([p, f]) => {
-        if (Array.isArray(p)) setPedidos(p)
-        else if (p?.pedidos) setPedidos(p.pedidos)
+    Promise.all([getFarmacias(), getOperadores()])
+      .then(([f, o]) => {
         if (Array.isArray(f)) setFarmacias(f)
         else if (f?.farmacias) setFarmacias(f.farmacias)
+        if (Array.isArray(o)) setOperadores(o)
+        else if (o?.operadores) setOperadores(o.operadores)
       })
-      .catch(() => {})
+      .catch((err) => {
+        console.error('Error al cargar farmacias/operadores:', err)
+      })
   }, [])
+
+  useEffect(() => {
+    setCargando(true)
+    const params = {}
+    if (filtroFechaDesde) params.desde = filtroFechaDesde
+    if (filtroFechaHasta) params.hasta = filtroFechaHasta
+
+    getPedidos(params)
+      .then((p) => {
+        if (Array.isArray(p)) setPedidos(p)
+        else if (p?.pedidos) setPedidos(p.pedidos)
+      })
+      .catch((err) => {
+        console.error('Error al cargar pedidos:', err)
+      })
+      .finally(() => setCargando(false))
+  }, [filtroFechaDesde, filtroFechaHasta])
 
   const filteredOrders = useMemo(() => {
     return pedidos.filter(order => {
-      if (filtroFechaDesde) {
-        const desde = new Date(filtroFechaDesde)
-        if (new Date(order.fecha_creacion) < desde) return false
-      }
-      if (filtroFechaHasta) {
-        const hasta = new Date(filtroFechaHasta)
-        if (new Date(order.fecha_creacion) > hasta) return false
-      }
       if (filtroFarmacia) {
         const farmacia = farmacias.find(f => f.id_farmacia === order.id_farmacia)
         if (farmacia?.nombre_comercial !== filtroFarmacia) return false
       }
+      if (filtroOperador) {
+        const opName = order.operador
+          ? `${order.operador.nombre_operador || ''} ${order.operador.apellido || ''}`.trim()
+          : order.despachador
+            ? `${order.despachador.nombre || ''} ${order.despachador.apellido || ''}`.trim()
+            : ''
+        if (opName !== filtroOperador) return false
+      }
       return true
     })
-  }, [pedidos, filtroFechaDesde, filtroFechaHasta, filtroFarmacia, farmacias])
+  }, [pedidos, filtroFechaDesde, filtroFechaHasta, filtroFarmacia, filtroOperador, farmacias])
 
   const order = selected
     ? pedidos.find(o => o.id_pedido === selected)
@@ -59,6 +82,11 @@ export default function OrdersPage() {
             <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">Pedidos Recientes</h3>
 
           </div>
+          {cargando && (
+            <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden mb-4">
+              <div className="h-full bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500 animate-pulse rounded-full" style={{ width: '100%' }} />
+            </div>
+          )}
           <div className="flex flex-wrap items-end gap-3 mb-5">
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">Desde</label>
@@ -91,9 +119,32 @@ export default function OrdersPage() {
                 ))}
               </select>
             </div>
-            {(filtroFechaDesde || filtroFechaHasta || filtroFarmacia) && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">Operador</label>
+              <select
+                value={filtroOperador}
+                onChange={e => setFiltroOperador(e.target.value)}
+                className="bg-gray-50 border border-gray-200 text-gray-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500"
+              >
+                <option value="">Todos</option>
+                {[...new Map(
+                  pedidos
+                    .flatMap(o => {
+                      const names = []
+                      if (o.operador) names.push(`${o.operador.nombre_operador || ''} ${o.operador.apellido || ''}`.trim())
+                      if (o.despachador) names.push(`${o.despachador.nombre || ''} ${o.despachador.apellido || ''}`.trim())
+                      return names
+                    })
+                    .filter(Boolean)
+                    .map(name => [name, name])
+                ).values()].map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </div>
+            {(filtroFechaDesde || filtroFechaHasta || filtroFarmacia || filtroOperador) && (
               <button
-                onClick={() => { setFiltroFechaDesde(''); setFiltroFechaHasta(''); setFiltroFarmacia('') }}
+                onClick={() => { setFiltroFechaDesde(''); setFiltroFechaHasta(''); setFiltroFarmacia(''); setFiltroOperador('') }}
                 className="bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.97]"
               >
                 Limpiar
@@ -108,14 +159,16 @@ export default function OrdersPage() {
                   <th className="text-left pb-3 pr-4">Farmacia</th>
                   <th className="text-left pb-3 pr-4">Items</th>
                   <th className="text-left pb-3 pr-4">Estado</th>
+                  <th className="text-left pb-3 pr-4">Fecha</th>
                   <th className="text-left pb-3 pr-4">Dron</th>
-                  <th className="text-left pb-3">Operador</th>
+                  <th className="text-left pb-3 pr-4">Operador</th>
+                  <th className="text-left pb-3">Despachado por</th>
                 </tr>
               </thead>
               <tbody>
                   {filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="py-8 text-center text-sm text-gray-400 font-semibold">No se encontraron pedidos con los filtros seleccionados</td>
+                    <td colSpan="8" className="py-8 text-center text-sm text-gray-400 font-semibold">No se encontraron pedidos con los filtros seleccionados</td>
                   </tr>
                 ) : (
                   filteredOrders.map((order, i) => (
@@ -131,8 +184,10 @@ export default function OrdersPage() {
                     <td className="py-3 pr-4 text-gray-800 font-medium">{order.farmacia?.nombre_comercial || `Farmacia #${order.id_farmacia}`}</td>
                     <td className="py-3 pr-4 text-gray-800 font-semibold">{(order.detalles || []).length}</td>
                     <td className="py-3 pr-4"><Badge text={order.estado_pedido} /></td>
+                    <td className="py-3 pr-4 text-gray-500 text-xs whitespace-nowrap">{order.fecha_creacion ? new Date(order.fecha_creacion).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                     <td className="py-3 pr-4 text-gray-600 font-medium">{order.dron?.modelo || order.dron?.nombre || (order.id_dron ? `#${order.id_dron}` : '—')}</td>
-                    <td className="py-3 text-gray-600 font-medium">{order.operador?.usuario ? `${order.operador.usuario.nombre} ${order.operador.usuario.apellido}` : '—'}</td>
+                    <td className="py-3 text-gray-600 font-medium">{order.operador ? `${order.operador.nombre_operador || ''} ${order.operador.apellido || ''}`.trim() || `#${order.operador.id_operador}` : '—'}</td>
+                    <td className="py-3 text-gray-600 font-medium">{order.despachador ? `${order.despachador.nombre || ''} ${order.despachador.apellido || ''}`.trim() : '—'}</td>
                   </tr>
                 )))}
               </tbody>
@@ -148,12 +203,18 @@ export default function OrdersPage() {
                 <Badge text={order.estado_pedido} />
               </div>
 
-              {(order.operador || order.dron) && (
+              {(order.operador || order.dron || order.despachador) && (
                 <div className="flex gap-4 text-xs">
-                  {order.operador?.usuario && (
+                  {order.operador && (
                     <div className="bg-gradient-to-br from-emerald-50/50 to-teal-50/50 rounded-xl px-4 py-3 border border-emerald-100/50 flex items-center gap-2">
                       <svg className="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                      <div><span className="text-gray-500 font-semibold">Operador:</span> <span className="text-gray-800 font-bold">{order.operador.usuario.nombre} {order.operador.usuario.apellido}</span></div>
+                      <div><span className="text-gray-500 font-semibold">Operador:</span> <span className="text-gray-800 font-bold">{order.operador.nombre_operador || ''} {order.operador.apellido || ''}</span></div>
+                    </div>
+                  )}
+                  {order.despachador && (
+                    <div className="bg-gradient-to-br from-purple-50/50 to-violet-50/50 rounded-xl px-4 py-3 border border-purple-100/50 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-purple-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A9 9 0 0112 15c2.114 0 4.066.71 5.621 1.904M15 10a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                      <div><span className="text-gray-500 font-semibold">Despachado por:</span> <span className="text-gray-800 font-bold">{order.despachador.nombre || ''} {order.despachador.apellido || ''}</span></div>
                     </div>
                   )}
                   {order.dron && (
@@ -184,6 +245,34 @@ export default function OrdersPage() {
                     <div>
                       <div className="text-gray-500 font-semibold uppercase tracking-widest mb-0.5">Teléfono</div>
                       <div className="text-gray-800 font-semibold">{profile.telefono}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {order.cliente && (
+                <div className="bg-gradient-to-br from-amber-50/50 to-orange-50/50 rounded-2xl p-5 space-y-3 border border-amber-100/50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
+                      {order.cliente.nombre?.charAt(0) || 'C'}
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-gray-800">{order.cliente.nombre} {order.cliente.apellido || ''}</div>
+                      <div className="text-xs text-gray-500">Cliente</div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <div className="text-gray-500 font-semibold uppercase tracking-widest mb-0.5">Cédula</div>
+                      <div className="text-gray-800 font-semibold">{order.cliente.cedula || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-500 font-semibold uppercase tracking-widest mb-0.5">Teléfono</div>
+                      <div className="text-gray-800 font-semibold">{order.cliente.telefono || '—'}</div>
+                    </div>
+                    <div className="col-span-2">
+                      <div className="text-gray-500 font-semibold uppercase tracking-widest mb-0.5">Correo</div>
+                      <div className="text-gray-800 font-semibold">{order.cliente.email}</div>
                     </div>
                   </div>
                 </div>

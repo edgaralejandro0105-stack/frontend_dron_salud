@@ -10,7 +10,8 @@ function formatCurrency(n) {
 }
 
 function PharmacyInstructions({ order, onClose }) {
-  const [comprobanteEnviado, setComprobanteEnviado] = useState(false)
+
+
   return (
     <div className="fixed inset-0 z-[70] flex flex-col items-center justify-start bg-gradient-to-br from-emerald-800 via-teal-900 to-green-900 overflow-y-auto" style={{ backgroundSize: '200% 200%' }}>
       <div className="w-full max-w-lg mx-auto text-center animate-fade-in py-6 sm:py-8 px-4">
@@ -69,9 +70,6 @@ function PharmacyInstructions({ order, onClose }) {
             <span className="font-bold text-emerald-300">{formatCurrency(order.total)}</span>
           </div>
         </div>
-        <button onClick={() => { alert('Comprobante enviado al cliente exitosamente'); setComprobanteEnviado(true) }} className={`w-full ${comprobanteEnviado ? 'bg-emerald-500/30 text-emerald-300 cursor-default' : 'bg-white/20 hover:bg-white/30 text-white'} font-bold py-2.5 sm:py-3 px-6 sm:px-8 rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/20 active:scale-[0.97] text-sm sm:text-base mb-3`}>
-          {comprobanteEnviado ? '✓ Comprobante enviado' : 'Enviar comprobante al cliente'}
-        </button>
         <button onClick={onClose} className="bg-white/20 hover:bg-white/30 text-white font-bold py-2.5 sm:py-3 px-6 sm:px-8 rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/20 active:scale-[0.97] text-sm sm:text-base">
           Volver a ordenes
         </button>
@@ -144,10 +142,12 @@ export default function OrdersReceivedPage({ user }) {
   }
 
   const sortedOrders = useMemo(
-    () => [...pedidos].sort((a, b) => {
-      const priority = { 'Preparando': -1, 'Pendiente': 0, 'Pagado': 1, 'Preparado': 2, 'En transito': 3, 'Entregado': 4 }
-      return (priority[a.estado_pedido] ?? 9) - (priority[b.estado_pedido] ?? 9)
-    }),
+    () => [...pedidos]
+      .filter(o => o.estado_pedido !== 'Entregado' && o.estado_pedido !== 'Cancelado')
+      .sort((a, b) => {
+        const priority = { 'Preparando': -1, 'Pendiente': 0, 'Pagado': 1, 'Preparado': 2, 'En transito': 3 }
+        return (priority[a.estado_pedido] ?? 9) - (priority[b.estado_pedido] ?? 9)
+      }),
     [pedidos]
   )
 
@@ -156,7 +156,7 @@ export default function OrdersReceivedPage({ user }) {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Ordenes Recibidas</h2>
-          <p className="text-sm text-gray-500 mt-1">{pedidos.length} orden{pedidos.length !== 1 ? 'es' : ''} recibida{pedidos.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm text-gray-500 mt-1">{sortedOrders.length} orden{sortedOrders.length !== 1 ? 'es' : ''} activa{sortedOrders.length !== 1 ? 's' : ''}</p>
         </div>
         <span className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white text-xs font-bold rounded-full px-4 py-1.5 shadow-md">
           {pedidos.filter(o => o.estado_pedido === 'Pendiente' || o.estado_pedido === 'Pagado' || o.estado_pedido === 'Preparado').length} activas
@@ -251,7 +251,11 @@ export default function OrdersReceivedPage({ user }) {
                   {(order.detalles || []).map((p, i) => (
                     <div key={i} className="flex items-center justify-between text-sm bg-gray-50 rounded-xl p-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-sm flex-shrink-0 font-bold text-emerald-500">Rx</div>
+                        {p.producto?.foto_url ? (
+                          <img src={p.producto.foto_url} alt="" className="w-8 h-8 rounded-lg border border-gray-200 object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-sm flex-shrink-0 font-bold text-emerald-500">Rx</div>
+                        )}
                         <div>
                           <div className="font-semibold text-gray-800">{p.nombre_producto}</div>
                           <div className="text-xs text-gray-500">x{p.cantidad}</div>
@@ -312,6 +316,9 @@ export default function OrdersReceivedPage({ user }) {
                       <p className="mt-1.5 font-mono font-bold">Ref: {order.pago?.referencia || '—'}</p>
                     </div>
                   </div>
+                  <p className="text-xs text-rose-600 font-semibold leading-relaxed text-center px-2 py-2 bg-rose-50 rounded-xl border border-rose-200">
+                    ⚠ Si el monto no es exacto o hay problemas con la transacción, comunícate con el cliente al {order.cliente?.telefono || '—'}.
+                  </p>
                   <button onClick={() => setConfirmPayment(order.id_pedido)} className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3.5 rounded-xl shadow-lg active:scale-[0.97]">
                     Confirmar Pago Recibido
                   </button>

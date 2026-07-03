@@ -16,9 +16,12 @@ import OperatorHistoryPage from '../pages/operator/HistoryPage'
 import UserManagementPage from '../pages/admin/UserManagementPage'
 import ClientsPage from '../pages/admin/ClientsPage'
 import ReportsPage from '../pages/admin/ReportsPage'
+import TariffsPage from '../pages/admin/TariffsPage'
 import SupportButton from '../components/ui/SupportButton'
-import PaymentConfigPage from '../pages/pharmacy/PaymentConfigPage'
-import PharmacyProfilePage from '../pages/pharmacy/PharmacyProfilePage'
+import PaymentConfigPage    from '../pages/pharmacy/PaymentConfigPage'
+import PharmacyProfilePage  from '../pages/pharmacy/PharmacyProfilePage'
+import PharmacyReportsPage  from '../pages/pharmacy/ReportsPage'
+import { getNotifications } from '../api'
 
 const moduleMap = {
   dashboard: null,
@@ -32,55 +35,169 @@ const moduleMap = {
   'delivery-history': OperatorHistoryPage,
   users: UserManagementPage,
   clientes: ClientsPage,
+  tarifas: TariffsPage,
   reports: ReportsPage,
-  'pharmacy-profile': PharmacyProfilePage,
+  'pharmacy-profile':  PharmacyProfilePage,
+  'pharmacy-reports':  PharmacyReportsPage,
+}
+
+function fmtBs(n) {
+  const num = Number(n)
+  if (isNaN(num) || num === 0) return ''
+  return 'Bs. ' + num.toLocaleString('es-VE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
 function NotificationBell({ user, onNavigate }) {
-  const [newCount, setNewCount] = useState(0)
-  const lastIdsRef = useRef(new Set())
+  const [notifications, setNotifications] = useState([])
+  const [open, setOpen] = useState(false)
+  const btnRef = useRef(null)
 
   useEffect(() => {
-    if (user?.role !== 'farmacia') return
-    try {
-      const saved = localStorage.getItem('dronSalud_orders')
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        lastIdsRef.current = new Set(parsed.filter(o => o.estado === 'Pendiente').map(o => o.id))
-      }
-    } catch {}
-    const interval = setInterval(() => {
-      try {
-        const saved = localStorage.getItem('dronSalud_orders')
-        if (!saved) return
-        const parsed = JSON.parse(saved)
-        const currentIds = new Set(parsed.filter(o => o.estado === 'Pendiente').map(o => o.id))
-        const newIds = [...currentIds].filter(id => !lastIdsRef.current.has(id))
-        if (newIds.length > 0) {
-          setNewCount(prev => prev + newIds.length)
-          lastIdsRef.current = currentIds
-        }
-      } catch {}
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [user])
+    const role = user?.role
+    if (!role || role === 'cliente') return
 
-  if (user?.role !== 'farmacia') return null
+    const poll = () => {
+      getNotifications()
+        .then(data => {
+          if (data?.pedidos) {
+            setNotifications(prev => {
+              const serverIds = new Set(data.pedidos.map(p => p.id_pedido))
+              const kept = prev.filter(p => serverIds.has(p.id_pedido))
+              const existingIds = new Set(kept.map(p => p.id_pedido))
+              const newOnes = data.pedidos.filter(p => !existingIds.has(p.id_pedido))
+              return [...newOnes, ...kept].slice(0, 50)
+            })
+          }
+        })
+        .catch(() => {})
+    }
+
+    poll()
+    const id = setInterval(poll, 5000)
+    return () => clearInterval(id)
+  }, [user?.role, user?.id_farmacia])
+
+  useEffect(() => {
+    if (!open) return
+    function handleClick(e) {
+      if (btnRef.current && !btnRef.current.contains(e.target)) {
+        const panel = document.querySelector('[data-notif-panel]')
+        if (panel && !panel.contains(e.target)) setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [open])
+
+  const role = user?.role
+  if (!role || role === 'cliente') return null
+
+  const navigateTo = role === 'farmacia' ? 'orders-received' : 'dispatch'
+  const hasNotifications = notifications.length > 0
+  const statusLabels = {
+    Pendiente: 'Pendiente', Pagado: 'Pagado', Preparado: 'Preparado',
+    'En transito': 'En tránsito', Entregado: 'Entregado'
+  }
+
+  function handleItemClick(notif) {
+    setOpen(false)
+    setNotifications(prev => prev.filter(n => n.id_pedido !== notif.id_pedido))
+    onNavigate(navigateTo)
+  }
+
+  function handleClearAll() {
+    setNotifications([])
+    setOpen(false)
+  }
 
   return (
-    <button
-      onClick={() => { setNewCount(0); onNavigate() }}
-      className="relative w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-all duration-200 flex-shrink-0"
-    >
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-      </svg>
-      {newCount > 0 && (
-        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-red-500/30">
-          {newCount > 9 ? '9+' : newCount}
-        </span>
+    <div className="relative flex-shrink-0">
+      <button
+        ref={btnRef}
+        onClick={() => setOpen(!open)}
+        className={`relative w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 ${
+          hasNotifications
+            ? 'bg-red-500 text-white shadow-lg shadow-red-500/30 hover:bg-red-600'
+            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+        }`}
+        title="Notificaciones"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+        {hasNotifications && (
+          <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-red-500 text-[10px] font-bold rounded-full flex items-center justify-center shadow-md">
+            {notifications.length > 9 ? '9+' : notifications.length}
+          </span>
+        )}
+      </button>
+
+      {open && createPortal(
+        <div className="fixed inset-0 z-[99999] flex justify-start pointer-events-none" onClick={() => setOpen(false)}>
+          <div
+            data-notif-panel
+            className="pointer-events-auto absolute bg-white rounded-2xl shadow-2xl border border-gray-100 w-80 overflow-hidden animate-fade-in"
+            style={{
+              top: btnRef.current ? btnRef.current.getBoundingClientRect().bottom + 8 : 60,
+              right: btnRef.current ? window.innerWidth - btnRef.current.getBoundingClientRect().right : 16,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <h3 className="text-sm font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Notificaciones</h3>
+              {hasNotifications && (
+                <button onClick={handleClearAll} className="text-[10px] font-semibold text-gray-400 hover:text-red-500 transition-colors">
+                  Limpiar todo
+                </button>
+              )}
+            </div>
+            <div className="max-h-[360px] overflow-y-auto">
+              {notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+                  <svg className="w-10 h-10 mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  <span className="text-xs font-medium">Sin notificaciones</span>
+                </div>
+              ) : (
+                notifications.map(n => (
+                  <button
+                    key={n.id_pedido}
+                    onClick={() => handleItemClick(n)}
+                    className="w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors flex items-start gap-3"
+                  >
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                      n.estado_pedido === 'Preparado' ? 'bg-amber-100 text-amber-600' : 'bg-sky-100 text-sky-600'
+                    }`}>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold text-gray-800 truncate">
+                        Pedido #{n.id_pedido} · {statusLabels[n.estado_pedido] || n.estado_pedido}
+                      </div>
+                      <div className="text-[11px] text-gray-500 mt-0.5 truncate">
+                        {n.farmacia?.nombre_comercial || ''}
+                        {n.farmacia && n.cliente ? ' · ' : ''}
+                        {n.cliente ? `${n.cliente.nombre || ''} ${n.cliente.apellido || ''}`.trim() : ''}
+                      </div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">
+                        {n.fecha_creacion ? new Date(n.fecha_creacion).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-gray-500 flex-shrink-0">
+                      {fmtBs(n.total)}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
-    </button>
+    </div>
   )
 }
 
@@ -146,7 +263,7 @@ export default function DashboardLayout({ modules, moduleTitles, user, onLogout,
         <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={closeSidebar} />
       )}
       <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 flex-shrink-0 flex flex-col bg-gradient-to-b from-[#0b1a30] via-[#0f2248] to-[#142d52] border-r border-white/5 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-        <div className="p-5">
+        <div className="flex-1 overflow-y-auto p-5">
           <div className="flex flex-col items-center mb-8 animate-fade-in-down">
             <img src={logo} alt="Dron Salud" className="w-40 h-40 object-contain mb-2" />
             <div className="text-[10px] uppercase tracking-[0.3em] text-blue-200/60 font-semibold text-center leading-tight">Logística Médica Inteligente</div>
@@ -166,7 +283,7 @@ export default function DashboardLayout({ modules, moduleTitles, user, onLogout,
           </nav>
         </div>
 
-        <div className="mt-auto p-5 space-y-3 border-t border-white/5">
+        <div className="flex-shrink-0 p-5 space-y-3 border-t border-white/5">
           <div className="flex items-center gap-3 rounded-xl px-4 py-3">
             <Avatar src={user?.foto_url} name={user?.nombre} size="md" />
             <div className="flex-1 min-w-0">
@@ -198,7 +315,7 @@ export default function DashboardLayout({ modules, moduleTitles, user, onLogout,
             </h1>
           </div>
           <div className="flex items-center gap-3 animate-fade-in flex-shrink-0">
-            <NotificationBell user={user} onNavigate={() => setActiveModule('ordersReceived')} />
+            <NotificationBell user={user} onNavigate={(module) => setActiveModule(module)} />
             <Clock date={clock} />
             <div className="relative">
               <button

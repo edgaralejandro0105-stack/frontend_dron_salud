@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { register } from '../../api'
 import logo from '../../assets/Dron_Salud.png'
+import DroneDelivery from '../../components/ui/DroneDelivery'
 
 function InputField({ label, type = 'text', placeholder = '', icon = null, value, onChange, name }) {
   return (
@@ -152,9 +153,7 @@ export default function RegisterPage({ onBackToLogin, onLoginSuccess }) {
         </div>
         <div className="relative z-10 text-center">
           <div className="mb-6 animate-float">
-            <div className="w-32 h-32 mx-auto bg-gradient-to-br from-indigo-500/20 to-violet-500/20 rounded-3xl p-4 border border-white/10 backdrop-blur-xl shadow-2xl">
-              <img src={logo} alt="Dron Salud" className="w-full h-full object-contain" />
-            </div>
+            <DroneDelivery />
           </div>
           <h2 className="text-3xl font-bold text-white font-['Plus_Jakarta_Sans'] mb-2">Nueva Cuenta</h2>
           <p className="text-blue-200/50">Únete a la red de logística inteligente</p>
@@ -166,8 +165,8 @@ export default function RegisterPage({ onBackToLogin, onLoginSuccess }) {
         <div className="relative z-10 w-full max-w-2xl animate-fade-in-up">
           <div className="bg-white/90 backdrop-blur-2xl rounded-3xl shadow-2xl shadow-indigo-500/10 border border-white/20 p-8">
             <div className="lg:hidden flex flex-col items-center mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500/20 to-violet-500/20 rounded-2xl p-3 border border-indigo-200/50 mb-3">
-                <img src={logo} alt="Dron Salud" className="w-full h-full object-contain" />
+              <div className="animate-float mb-3">
+                <img src={logo} alt="Dron Salud" className="w-20 h-20 object-contain" />
               </div>
               <h2 className="text-lg font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Crear Cuenta</h2>
             </div>

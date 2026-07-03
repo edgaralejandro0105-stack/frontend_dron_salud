@@ -17,7 +17,14 @@ function smoothPoints(points) {
 
 export default function AreaChartSVG({ data, dataKey, color = '#2563eb' }) {
   const W = 600, H = 260, padL = 50, padR = 20, padT = 20, padB = 40
-  const maxVal = Math.max(...data.map(d => d[dataKey]))
+  const maxVal = data.length > 0 ? Math.max(...data.map(d => d[dataKey])) : 0
+  if (data.length === 0 || maxVal === 0) {
+    return (
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full">
+        <text x={W / 2} y={H / 2} textAnchor="middle" fontSize="14" fill="#9ca3af" fontFamily="Inter, sans-serif">Sin datos</text>
+      </svg>
+    )
+  }
   const chartW = W - padL - padR
   const chartH = H - padT - padB
   const points = data.map((d, i) => ({

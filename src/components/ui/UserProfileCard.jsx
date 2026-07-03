@@ -14,6 +14,8 @@ export default function UserProfileCard({ profile, onUpdate, defaultOpen, modalO
   const [passForm, setPassForm] = useState({
     currentPassword: '', newPassword: '', confirmPassword: ''
   })
+  const [viewingPhoto, setViewingPhoto] = useState(false)
+  const [confirmSave, setConfirmSave] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -34,11 +36,15 @@ export default function UserProfileCard({ profile, onUpdate, defaultOpen, modalO
     }).catch(() => {})
   }, [showModal])
 
-  async function handleSaveProfile(e) {
+  function handleSubmitProfile(e) {
     e.preventDefault()
     setError('')
     if (!form.nombre.trim()) { setError('El nombre es obligatorio'); return }
     if (!form.email.trim()) { setError('El correo es obligatorio'); return }
+    setConfirmSave(true)
+  }
+
+  async function handleSaveProfile() {
     setSaving(true)
     try {
       const userId = profile?.id_usuario
@@ -59,6 +65,7 @@ export default function UserProfileCard({ profile, onUpdate, defaultOpen, modalO
       setError(err?.response?.data?.message || 'Error al guardar')
     }
     setSaving(false)
+    setConfirmSave(false)
   }
 
   async function handleSavePassword(e) {
@@ -118,7 +125,8 @@ export default function UserProfileCard({ profile, onUpdate, defaultOpen, modalO
   )
 
   const modal = showModal && (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', padding: '1rem' }} onClick={closeModal}>
+    <>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', padding: '1rem' }} onClick={closeModal}>
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden animate-scale-in" onClick={e => e.stopPropagation()} style={{ boxShadow: '0 25px 60px rgba(0,0,0,0.15)' }}>
         {/* Header */}
         <div className="relative px-8 pt-8 pb-0">
@@ -171,37 +179,45 @@ export default function UserProfileCard({ profile, onUpdate, defaultOpen, modalO
         {/* Content */}
         <div className="px-8 pb-8 overflow-y-auto max-h-[50vh]">
           {tab === 'profile' ? (
-            <form onSubmit={handleSaveProfile} className="space-y-4">
+            <form onSubmit={handleSubmitProfile} className="space-y-4">
               {/* Photo */}
               <div className="flex items-center gap-5 pb-4 border-b border-gray-100">
-                <div className="relative group flex-shrink-0">
-                  <div className="w-20 h-20 rounded-2xl overflow-hidden bg-gradient-to-br from-blue-100 to-indigo-100 border-2 border-gray-100 flex items-center justify-center shadow-inner">
-                    {avatarSrc ? (
-                      <img src={avatarSrc} alt="Foto" className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class=\"text-2xl font-bold text-indigo-400\">' + (form.nombre?.charAt(0) || '?') + '</span>' }} />
-                    ) : (
-                      <span className="text-2xl font-bold text-indigo-400">{form.nombre?.charAt(0) || '?'}</span>
+                  <div className="relative group flex-shrink-0">
+                    <div className="w-20 h-20 rounded-2xl overflow-hidden bg-gradient-to-br from-blue-100 to-indigo-100 border-2 border-gray-100 flex items-center justify-center shadow-inner">
+                      {avatarSrc ? (
+                        <img src={avatarSrc} alt="Foto" className="w-full h-full object-cover cursor-pointer" onClick={() => setViewingPhoto(true)} onError={e => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class=\"text-2xl font-bold text-indigo-400\">' + (form.nombre?.charAt(0) || '?') + '</span>' }} />
+                      ) : (
+                        <span className="text-2xl font-bold text-indigo-400">{form.nombre?.charAt(0) || '?'}</span>
+                      )}
+                    </div>
+                    {!isPharmacy && (
+                      <>
+                        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}
+                          className="absolute -bottom-1 -right-1 w-8 h-8 rounded-xl bg-white border border-gray-200 shadow-md flex items-center justify-center text-gray-500 hover:text-blue-600 hover:border-blue-300 transition-all hover:shadow-lg hover:shadow-blue-500/10 disabled:opacity-50">
+                          {uploading ? (
+                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                          ) : (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                          )}
+                        </button>
+                        {avatarSrc && (
+                          <button type="button" onClick={() => setForm({ ...form, foto_url: '' })}
+                            className="absolute -top-1 -right-1 w-7 h-7 rounded-xl bg-white border border-red-200 shadow-md flex items-center justify-center text-red-400 hover:text-red-600 hover:border-red-300 transition-all hover:shadow-lg hover:shadow-red-500/10">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
+                        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }} />
+                      </>
                     )}
                   </div>
-                  {!isPharmacy && (
-                    <>
-                      <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}
-                        className="absolute -bottom-1 -right-1 w-8 h-8 rounded-xl bg-white border border-gray-200 shadow-md flex items-center justify-center text-gray-500 hover:text-blue-600 hover:border-blue-300 transition-all hover:shadow-lg hover:shadow-blue-500/10 disabled:opacity-50">
-                        {uploading ? (
-                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                          </svg>
-                        ) : (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                        )}
-                      </button>
-                      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }} />
-                    </>
-                  )}
-                </div>
                 <div className="min-w-0">
                   <div className="text-sm font-bold text-gray-900 truncate">{form.nombre || 'Tu nombre'}</div>
                   {!isPharmacy && <div className="text-xs text-gray-400 mt-0.5">Toca la cámara para cambiar tu foto</div>}
@@ -266,6 +282,26 @@ export default function UserProfileCard({ profile, onUpdate, defaultOpen, modalO
                   </button>
                 </div>
               )}
+
+              {confirmSave && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', padding: '1rem' }} onClick={() => setConfirmSave(false)}>
+                  <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm mx-4 w-full animate-scale-in text-center" onClick={e => e.stopPropagation()}>
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </div>
+                    <p className="text-gray-800 text-sm font-bold mb-2">¿Guardar cambios?</p>
+                    <p className="text-xs text-gray-500 mb-6">Confirma si deseas actualizar tus datos personales.</p>
+                    <div className="flex gap-3">
+                      <button type="button" onClick={() => setConfirmSave(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl transition-all text-sm">Cancelar</button>
+                      <button type="button" onClick={handleSaveProfile} disabled={saving} className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 rounded-xl shadow-lg transition-all text-sm disabled:opacity-50">
+                        {saving ? 'Guardando...' : 'Confirmar'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </form>
           ) : (
             <form onSubmit={handleSavePassword} className="space-y-4">
@@ -291,7 +327,7 @@ export default function UserProfileCard({ profile, onUpdate, defaultOpen, modalO
               </div>
               <div className="pt-3">
                 <button type="submit" disabled={saving}
-                  className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold py-3 rounded-2xl transition-all duration-200 shadow-lg shadow-amber-500/25 hover:shadow-xl active:scale-[0.98] disabled:opacity-50 text-sm">
+                  className="w-full bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-bold py-3 rounded-2xl transition-all duration-200 shadow-lg shadow-sky-500/25 hover:shadow-xl active:scale-[0.98] disabled:opacity-50 text-sm">
                   {saving ? 'Cambiando...' : 'Cambiar contraseña'}
                 </button>
               </div>
@@ -300,6 +336,13 @@ export default function UserProfileCard({ profile, onUpdate, defaultOpen, modalO
         </div>
       </div>
     </div>
+
+      {viewingPhoto && avatarSrc && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.85)', padding: '2rem', cursor: 'zoom-out' }} onClick={() => setViewingPhoto(false)}>
+          <img src={avatarSrc} alt="Foto de perfil" className="max-w-full max-h-full rounded-2xl shadow-2xl animate-scale-in object-contain" onClick={e => e.stopPropagation()} style={{ maxWidth: '90vw', maxHeight: '90vh' }} />
+        </div>
+      )}
+    </>
   )
 
   return (

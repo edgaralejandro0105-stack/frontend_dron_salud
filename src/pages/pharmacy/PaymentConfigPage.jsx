@@ -5,12 +5,14 @@ const banks = [
   'Banco de Venezuela', 'Banco Mercantil', 'Banco Provincial', 'Banco Nacional de Crédito',
   'Banco Banesco', 'Banco Occidental de Descuento', 'Banco Exterior',
   'Banco del Tesoro', 'Banco Sofitasa', 'Banco Caroní', '100% Banco',
+  'Otros',
 ]
 
 export default function PaymentConfigPage({ user }) {
   const farmaciaId = user?.id_farmacia
   const [profile, setProfile] = useState(null)
   const [banco, setBanco] = useState('')
+  const [isCustom, setIsCustom] = useState(false)
   const [telefono, setTelefono] = useState('')
   const [ci, setCi] = useState('')
   const [titular, setTitular] = useState('')
@@ -20,8 +22,10 @@ export default function PaymentConfigPage({ user }) {
   useEffect(() => {
     if (!farmaciaId) return
     getFarmacia(farmaciaId).then(f => {
+      const savedBanco = f.pago_movil_banco || ''
       setProfile(f)
-      setBanco(f.pago_movil_banco || '')
+      setBanco(savedBanco)
+      setIsCustom(savedBanco && !banks.includes(savedBanco))
       setTelefono(f.pago_movil_telefono || '')
       setCi(f.pago_movil_ci || '')
       setTitular(f.pago_movil_titular || f.nombre_comercial || '')
@@ -73,10 +77,21 @@ export default function PaymentConfigPage({ user }) {
 
         <div>
           <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Banco</label>
-          <select value={banco} onChange={e => setBanco(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm bg-white">
+          <select value={isCustom ? 'Otros' : banco} onChange={e => {
+            if (e.target.value === 'Otros') {
+              setIsCustom(true)
+              setBanco('')
+            } else {
+              setIsCustom(false)
+              setBanco(e.target.value)
+            }
+          }} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm bg-white">
             <option value="">Selecciona tu banco</option>
             {banks.map(b => <option key={b} value={b}>{b}</option>)}
           </select>
+          {isCustom && (
+            <input type="text" value={banco} onChange={e => setBanco(e.target.value)} placeholder="Escribe el nombre del banco" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm bg-white mt-2" autoFocus />
+          )}
         </div>
 
         <div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { getDrones, createDron, updateDron, removeDron, uploadFile } from '../../api'
+import { getDrones, createDron, updateDron, removeDron, getDronHistorial, uploadFile } from '../../api'
 
 const estados = ['Activo', 'Transito', 'Mantenimiento', 'Cancelado']
 
@@ -14,6 +14,7 @@ export default function FleetPage() {
   const [drones, setDrones] = useState([])
   const [modal, setModal] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [historyModal, setHistoryModal] = useState(null)
 
   useEffect(() => {
     if (modal) {
@@ -54,6 +55,15 @@ export default function FleetPage() {
       setConfirmDelete(null)
     } catch (err) {
       alert(err?.response?.data?.message || err?.response?.data?.error || 'Error al eliminar')
+    }
+  }
+
+  async function handleViewHistory(dron) {
+    try {
+      const data = await getDronHistorial(dron.id_dron)
+      setHistoryModal(data)
+    } catch (err) {
+      alert('Error al cargar el historial')
     }
   }
 
@@ -115,6 +125,15 @@ export default function FleetPage() {
                       <td className="py-3">
                         <div className="flex items-center gap-1">
                           <button
+                            onClick={() => handleViewHistory(d)}
+                            className="p-1.5 rounded-lg hover:bg-indigo-100 text-indigo-600 transition-colors"
+                            title="Ver historial"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                            </svg>
+                          </button>
+                          <button
                             onClick={() => setModal({ mode: 'edit', drone: d })}
                             className="p-1.5 rounded-lg hover:bg-blue-100 text-blue-600 transition-colors"
                             title="Editar"
@@ -145,6 +164,8 @@ export default function FleetPage() {
 
       {modal && <DroneModal mode={modal.mode} drone={modal.drone} onSave={handleSave} onClose={() => setModal(null)} />}
 
+      {historyModal && <HistoryModal data={historyModal} onClose={() => setHistoryModal(null)} />}
+
       {confirmDelete && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 w-full max-w-sm text-center">
@@ -167,6 +188,99 @@ export default function FleetPage() {
   )
 }
 
+function HistoryModal({ data, onClose }) {
+  const { dron, mantenimientos, pedidos } = data
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-3xl mx-4 max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Historial del Dron</h3>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {dron.matricula} - {dron.modelo}
+              <span className={`inline-block w-2 h-2 rounded-full ml-2 ${statusColors[dron.estado_operativo] || 'bg-gray-400'}`} />
+              <span className="ml-1 text-xs font-semibold">{dron.estado_operativo}</span>
+              {dron.estado_operativo === 'Mantenimiento' && dron.motivo_mantenimiento && (
+                <span className="ml-2 text-xs text-amber-600">({dron.motivo_mantenimiento})</span>
+              )}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {mantenimientos.length === 0 && pedidos.length === 0 ? (
+            <p className="text-center text-gray-400 py-8">No hay historial registrado para este dron</p>
+          ) : (
+            <>
+              {mantenimientos.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Mantenimientos ({mantenimientos.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {mantenimientos.map(m => (
+                      <div key={m.id_mantenimiento} className="bg-amber-50/50 rounded-xl p-4 border border-amber-100">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                            m.estado === 'Completado' ? 'bg-emerald-100 text-emerald-700' :
+                            m.estado === 'En progreso' ? 'bg-sky-100 text-sky-700' :
+                            'bg-amber-100 text-amber-700'
+                          }`}>{m.estado}</span>
+                          <span className="text-xs text-gray-400">{new Date(m.fecha_ingreso).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <p className="text-sm font-semibold text-gray-800">{m.tipo_servicio}</p>
+                        {m.descripcion_falla && <p className="text-xs text-gray-600 mt-1">{m.descripcion_falla}</p>}
+                        {m.usuario && <p className="text-xs text-gray-400 mt-1">Registrado por: {m.usuario.nombre} {m.usuario.apellido}</p>}
+                        {m.fecha_completado && (
+                          <p className="text-xs text-gray-400 mt-1">Completado: {new Date(m.fecha_completado).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {pedidos.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                    Envios Realizados ({pedidos.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {pedidos.map(p => (
+                      <div key={p.id_pedido} className="bg-sky-50/50 rounded-xl p-4 border border-sky-100">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                            p.estado_pedido === 'Entregado' ? 'bg-emerald-100 text-emerald-700' :
+                            p.estado_pedido === 'Cancelado' ? 'bg-red-100 text-red-700' :
+                            'bg-sky-100 text-sky-700'
+                          }`}>#{p.id_pedido} - {p.estado_pedido}</span>
+                          <span className="text-xs text-gray-400">{new Date(p.fecha_creacion).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                        </div>
+                        {p.farmacia && <p className="text-xs text-gray-600">Farmacia: {p.farmacia.nombre_comercial}</p>}
+                        <p className="text-xs text-gray-500 mt-1">Destino: {p.destino_direccion || p.destino_nombre || 'No especificado'}</p>
+                        <p className="text-xs font-semibold text-gray-700 mt-1">Total: Bs. {Number(p.total).toFixed(2)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function DroneModal({ mode, drone, onSave, onClose }) {
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef(null)
@@ -182,6 +296,7 @@ function DroneModal({ mode, drone, onSave, onClose }) {
           estado_operativo: drone.estado_operativo || 'Activo',
           horas_vuelo: drone.horas_vuelo || '',
           foto_url: drone.foto_url || '',
+          motivo_mantenimiento: drone.motivo_mantenimiento || '',
         }
       : {
           modelo: '',
@@ -193,6 +308,7 @@ function DroneModal({ mode, drone, onSave, onClose }) {
           estado_operativo: 'Activo',
           horas_vuelo: '',
           foto_url: '',
+          motivo_mantenimiento: '',
         }
   )
 
@@ -252,6 +368,20 @@ function DroneModal({ mode, drone, onSave, onClose }) {
               </select>
             </div>
           </div>
+          {form.estado_operativo === 'Mantenimiento' && (
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Motivo de Mantenimiento</label>
+              <textarea
+                name="motivo_mantenimiento"
+                value={form.motivo_mantenimiento || ''}
+                onChange={handleChange}
+                placeholder="Describa la razon del mantenimiento..."
+                rows={3}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm resize-none"
+                required
+              />
+            </div>
+          )}
           <div>
             <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Foto del Dron</label>
             <div className="flex items-center gap-3">

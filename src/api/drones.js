@@ -17,3 +17,15 @@ export const updateDron = (id, data) =>
 
 export const removeDron = (id) =>
   api.delete(`/drones/${id}`).then(r => r.data)
+
+export const getDronHistorial = (id) =>
+  api.get(`/drones/${id}/historial`).then(r => r.data)
+
+export const getMantenimientosByDron = (id_dron) =>
+  api.get(`/mantenimiento/dron/${id_dron}`).then(r => r.data)
+
+export const createMantenimiento = (data) =>
+  api.post('/mantenimiento', data).then(r => r.data)
+
+export const completarMantenimiento = (id) =>
+  api.patch(`/mantenimiento/${id}/completar`).then(r => r.data)

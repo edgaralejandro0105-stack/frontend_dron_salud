@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { getFarmacias, getProductos, createPedido, createPago, getDirecciones, createDireccion, deleteDireccion } from '../../api'
+import { getFarmacias, getProductos, createPedido, createPago, getDirecciones, createDireccion, deleteDireccion, getConfiguracion } from '../../api'
 import Badge from '../../components/ui/Badge'
 import LocationPicker from '../../components/maps/LocationPicker'
 import logo from '../../assets/Dron_Salud.png'
@@ -17,9 +17,9 @@ const medicineColors = {
   10: 'bg-sky-400',
 }
 
-function InvoiceModal({ cart, profile, onClose, onPlaceOrder }) {
+function InvoiceModal({ cart, profile, onClose, onPlaceOrder, cargoDron: cargoDronProp }) {
+  const cargoDron = Number(cargoDronProp) || 5000
   const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.precio) * item.qty, 0)
-  const cargoDron = 5000
   const iva = Math.round(cartTotal * 0.16)
   const total = cartTotal + cargoDron + iva
 
@@ -196,14 +196,14 @@ function SavedLocationsStep({ locations, onSelect, onNewLocation, onBack, onDele
   )
 }
 
-function PaymentModal({ cart, profile, user, onSuccess, onBack }) {
+function PaymentModal({ cart, profile, user, onSuccess, onBack, cargoDron: cargoDronProp }) {
   const [step, setStep] = useState('form')
   const [error, setError] = useState('')
 
   const [mobileRef, setMobileRef] = useState('')
 
+  const cargoDron = Number(cargoDronProp) || 5000
   const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.precio) * item.qty, 0)
-  const cargoDron = 5000
   const iva = Math.round(cartTotal * 0.16)
   const total = cartTotal + cargoDron + iva
 
@@ -385,9 +385,9 @@ function PaymentModal({ cart, profile, user, onSuccess, onBack }) {
   )
 }
 
-function DroneInstructions({ cart, profile, deliveryLocation, operator, user, paymentInfo, onBackToShop }) {
+function DroneInstructions({ cart, profile, deliveryLocation, operator, user, paymentInfo, onBackToShop, cargoDron: cargoDronProp }) {
+  const cargoDron = Number(cargoDronProp) || 5000
   const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.precio) * item.qty, 0)
-  const cargoDron = 5000
   const iva = Math.round(cartTotal * 0.16)
   const granTotal = cartTotal + cargoDron + iva
 
@@ -552,7 +552,10 @@ function DroneInstructions({ cart, profile, deliveryLocation, operator, user, pa
 function ProductCard({ product, inCart, stockOk, onAdd }) {
   const [qty, setQty] = useState(1)
   const stock = Number(product.stock_actual) || 0
+  const inCartQty = inCart?.qty || 0
+  const maxAvailable = Math.max(0, stock - inCartQty)
   const cond = stock > 100 ? 'text-emerald-600' : stock > 20 ? 'text-amber-600' : 'text-red-600'
+  const cappedQty = maxAvailable < 1 ? 0 : Math.min(qty, maxAvailable)
 
   return (
     <div className="group bg-white rounded-2xl border border-slate-100 p-3 hover:border-sky-200 hover:shadow-[0_8px_30px_rgba(14,165,233,0.1)] transition-all duration-300 flex flex-col">
@@ -596,32 +599,39 @@ function ProductCard({ product, inCart, stockOk, onAdd }) {
         <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden">
           <button
             onClick={() => setQty(Math.max(1, qty - 1))}
-            className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors text-sm font-bold"
+            disabled={maxAvailable < 1}
+            className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors text-sm font-bold disabled:opacity-30"
           >−</button>
           <input
             type="number"
             min="1"
-            value={qty}
-            onChange={e => setQty(Math.max(1, parseInt(e.target.value) || 1))}
-            className="w-9 h-8 text-center text-xs font-bold text-slate-800 bg-transparent border-x border-slate-200 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            max={maxAvailable}
+            value={maxAvailable < 1 ? 0 : qty}
+            onChange={e => {
+              const v = parseInt(e.target.value) || 1
+              setQty(Math.min(Math.max(1, v), maxAvailable))
+            }}
+            disabled={maxAvailable < 1}
+            className="w-9 h-8 text-center text-xs font-bold text-slate-800 bg-transparent border-x border-slate-200 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none disabled:opacity-30"
           />
           <button
-            onClick={() => setQty(qty + 1)}
-            className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors text-sm font-bold"
+            onClick={() => setQty(Math.min(qty + 1, maxAvailable))}
+            disabled={maxAvailable < 1}
+            className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors text-sm font-bold disabled:opacity-30"
           >+</button>
         </div>
         <button
           onClick={() => { onAdd(product, qty); setQty(1) }}
-          disabled={!stockOk}
+          disabled={!stockOk || maxAvailable < 1}
           className={`flex-1 h-8 rounded-xl text-[10px] font-bold transition-all duration-200 ${
             inCart
               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-              : stockOk
+              : stockOk && maxAvailable > 0
                 ? 'bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white shadow-md hover:shadow-lg active:scale-[0.97]'
                 : 'bg-slate-100 text-slate-400 cursor-not-allowed'
           }`}
         >
-          {!stockOk ? 'Sin stock' : inCart ? `✓ ${inCart.qty + qty}` : 'Agregar'}
+          {!stockOk || maxAvailable < 1 ? (maxAvailable < 1 ? 'Sin stock' : 'Sin stock') : inCart ? `✓ ${inCartQty + qty}` : 'Agregar'}
         </button>
       </div>
     </div>
@@ -642,13 +652,20 @@ export default function NewOrderPage({ user }) {
   const [deliveryLocation, setDeliveryLocation] = useState(null)
   const [paymentInfo, setPaymentInfo] = useState({})
   const [savedLocations, setSavedLocations] = useState([])
+  const [cargoDron, setCargoDron] = useState(5000)
   const operatorProfile = null
   const [searchQuery, setSearchQuery] = useState('')
   const [filterCategoria, setFilterCategoria] = useState('todos')
   const [cartOpen, setCartOpen] = useState(false)
 
   useEffect(() => {
-    getFarmacias().then(setFarmacias).catch(() => {})
+    getFarmacias().then(data => {
+      const list = Array.isArray(data) ? data : data?.farmacias || []
+      setFarmacias(list)
+    }).catch(() => {})
+    getConfiguracion('cargo_dron').then(c => {
+      if (c?.valor) setCargoDron(Number(c.valor))
+    }).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -707,14 +724,19 @@ export default function NewOrderPage({ user }) {
 
   function addToCart(product, qty) {
     if (qty < 1) return
+    const stock = Number(product.stock_actual) || 0
     setCart(prev => {
       const exist = prev.find(c => c.product.id_producto === product.id_producto)
+      const existingQty = exist ? exist.qty : 0
+      const maxQty = Math.max(0, stock - existingQty)
+      const finalQty = Math.min(qty, maxQty)
+      if (finalQty < 1) return prev
       if (exist) {
         return prev.map(c =>
-          c.product.id_producto === product.id_producto ? { ...c, qty: c.qty + qty } : c
+          c.product.id_producto === product.id_producto ? { ...c, qty: existingQty + finalQty } : c
         )
       }
-      return [...prev, { product, qty }]
+      return [...prev, { product, qty: finalQty }]
     })
   }
 
@@ -725,7 +747,11 @@ export default function NewOrderPage({ user }) {
   function updateQty(productId, qty) {
     if (qty < 1) { removeFromCart(productId); return }
     setCart(prev =>
-      prev.map(c => (c.product.id_producto === productId ? { ...c, qty } : c))
+      prev.map(c => {
+        if (c.product.id_producto !== productId) return c
+        const stock = Number(c.product.stock_actual) || 0
+        return { ...c, qty: Math.min(qty, stock) }
+      })
     )
   }
 
@@ -790,7 +816,6 @@ export default function NewOrderPage({ user }) {
     setPaymentInfo(paymentInfo)
 
     const cartTotal = cart.reduce((sum, item) => sum + Number(item.product.precio) * item.qty, 0)
-    const cargoDron = 5000
     const iva = Math.round(cartTotal * 0.16)
 
     try {
@@ -869,11 +894,14 @@ export default function NewOrderPage({ user }) {
           </p>
         </div>
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-          {farmacias.map(p => (
+          {farmacias.map(p => {
+            const cerrada = p.estado_operativo === false
+            return (
             <button
               key={p.id_farmacia}
-              onClick={() => setSelectedPharmacy(p)}
-              className="group relative bg-white rounded-3xl border border-slate-100 overflow-hidden hover:border-sky-200 hover:shadow-[0_12px_40px_rgba(14,165,233,0.12)] transition-all duration-500 text-left"
+              onClick={() => !cerrada && setSelectedPharmacy(p)}
+              disabled={cerrada}
+              className={`group relative bg-white rounded-3xl border overflow-hidden transition-all duration-500 text-left ${cerrada ? 'border-red-100 opacity-70 cursor-not-allowed' : 'border-slate-100 hover:border-sky-200 hover:shadow-[0_12px_40px_rgba(14,165,233,0.12)]'}`}
             >
               <div className={`h-48 relative overflow-hidden ${p.foto_fachada_url ? '' : 'bg-gradient-to-br from-sky-500 to-blue-600'}`}>
                 {p.foto_fachada_url ? (
@@ -881,6 +909,7 @@ export default function NewOrderPage({ user }) {
                 ) : (
                   <div className="absolute inset-0 bg-gradient-to-br from-sky-500/20 to-blue-600/20" />
                 )}
+                {cerrada && <div className="absolute inset-0 bg-slate-900/50 z-10" />}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent" />
                 <div className="absolute bottom-4 left-4 right-4 flex items-center gap-3">
                   <div className="w-14 h-14 rounded-2xl bg-white/90 backdrop-blur-md flex items-center justify-center shadow-lg flex-shrink-0 overflow-hidden">
@@ -895,6 +924,13 @@ export default function NewOrderPage({ user }) {
                     <div className="text-xs text-white/70 truncate">{p.ciudad}</div>
                   </div>
                 </div>
+                {cerrada && (
+                  <div className="absolute inset-0 z-20 flex items-center justify-center">
+                    <span className="bg-red-500/90 text-white text-sm font-bold px-5 py-2 rounded-xl shadow-lg backdrop-blur-sm">
+                      Temporalmente cerrada
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="p-4 space-y-2">
                 <div className="flex items-start gap-2 text-xs text-slate-500">
@@ -911,16 +947,23 @@ export default function NewOrderPage({ user }) {
                   <span>{p.telefono}</span>
                 </div>
                 <div className="pt-1">
-                  <span className="text-xs font-semibold text-sky-600 group-hover:text-sky-800 transition-colors inline-flex items-center gap-1">
-                    Explorar catálogo
-                    <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </span>
+                  {cerrada ? (
+                    <span className="text-xs font-semibold text-red-500 inline-flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                      No disponible
+                    </span>
+                  ) : (
+                    <span className="text-xs font-semibold text-sky-600 group-hover:text-sky-800 transition-colors inline-flex items-center gap-1">
+                      Explorar catálogo
+                      <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </span>
+                  )}
                 </div>
               </div>
             </button>
-          ))}
+          )})}
         </div>
       </div>
     )
@@ -1110,7 +1153,8 @@ export default function NewOrderPage({ user }) {
                             <span className="w-8 text-center text-sm font-bold text-slate-800">{item.qty}</span>
                             <button
                               onClick={() => updateQty(item.product.id_producto, item.qty + 1)}
-                              className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                              disabled={item.qty >= Number(item.product.stock_actual)}
+                              className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                             >+</button>
                           </div>
                           <div className="text-xs font-bold text-slate-800">
@@ -1150,6 +1194,7 @@ export default function NewOrderPage({ user }) {
           profile={profile}
           onClose={() => setShowInvoice(false)}
           onPlaceOrder={placeOrder}
+          cargoDron={cargoDron}
         />
       )}
 
@@ -1179,6 +1224,7 @@ export default function NewOrderPage({ user }) {
           deliveryLocation={deliveryLocation}
           onSuccess={handlePaymentSuccess}
           onBack={handlePaymentBack}
+          cargoDron={cargoDron}
         />
       )}
 
@@ -1191,6 +1237,7 @@ export default function NewOrderPage({ user }) {
           deliveryLocation={deliveryLocation}
           operator={operatorProfile}
           onBackToShop={backToShop}
+          cargoDron={cargoDron}
         />
       )}
     </>
