@@ -52,10 +52,10 @@ export default function DispatchPage({ user }) {
 
   function loadData() {
     Promise.all([
-      getPedidos(),
+      getPedidos({ limit: 1000 }),
       getDronesDisponibles(),
     ]).then(([p, d]) => {
-      const list = Array.isArray(p) ? p : (p?.pedidos || [])
+      const list = Array.isArray(p) ? p : (p?.pedidos || p?.data || [])
       setPedidos(list)
       if (Array.isArray(d)) setDrones(d)
       else if (d?.drones) setDrones(d.drones)

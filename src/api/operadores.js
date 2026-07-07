@@ -1,7 +1,7 @@
 import api from './client'
 
-export const getOperadores = () =>
-  api.get('/operadores').then(r => r.data)
+export const getOperadores = ({ search, page, limit } = {}) =>
+  api.get('/operadores', { params: { search, page, limit } }).then(r => r.data)
 
 export const getOperador = (id) =>
   api.get(`/operadores/${id}`).then(r => r.data)

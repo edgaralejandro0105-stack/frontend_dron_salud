@@ -34,9 +34,10 @@ export default function PharmacyDashboardPage({ user }) {
 
   useEffect(() => {
     if (!farmaciaId) return
-    getPedidos({ id_farmacia: farmaciaId }).then(data => {
+    getPedidos({ id_farmacia: farmaciaId, limit: 1000 }).then(data => {
       if (Array.isArray(data)) setPedidos(data)
       else if (data?.pedidos) setPedidos(data.pedidos)
+      else if (data?.data) setPedidos(data.data)
     }).catch(() => {})
     getFarmacia(farmaciaId).then(setProfile).catch(() => {})
   }, [farmaciaId])

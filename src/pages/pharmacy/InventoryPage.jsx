@@ -1,119 +1,82 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { getProductos, createProducto, updateProducto, removeProducto, uploadFile } from '../../api'
 import Badge from '../../components/ui/Badge'
 
 const unidades = ['Tabletas', 'Cápsulas', 'Ampollas', 'Frascos', 'ml', 'mg', 'Unidades']
+const PAGE_SIZE = 10
 
-function getEstado(stock) {
-  if (stock > 10) return 'Disponible'
-  if (stock >= 6) return 'Bajo stock'
-  return 'Crítico'
+function getEstado(stock, stockMinimo) {
+  const min = stockMinimo != null ? Number(stockMinimo) : 10
+  if (stock === 0) return 'Crítico'
+  if (stock <= min) return 'Bajo stock'
+  return 'Disponible'
 }
 
 export default function InventoryPage({ user }) {
   const farmaciaId = user?.id_farmacia
   const [products, setProducts] = useState([])
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editProduct, setEditProduct] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
-  const [search, setSearch] = useState('')
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef(null)
 
-  useEffect(() => {
+  const loadProducts = useCallback((p = 1, s = '') => {
     if (!farmaciaId) return
-    getProductos({ id_farmacia: farmaciaId }).then(data => {
-      if (Array.isArray(data)) setProducts(data)
-      else if (data?.productos) setProducts(data.productos)
+    getProductos({ id_farmacia: farmaciaId, search: s || undefined, page: p, limit: PAGE_SIZE }).then(data => {
+      setProducts(data.data || [])
+      setTotal(data.total || 0)
+      setTotalPages(data.totalPages || 1)
+      setPage(data.page || 1)
     }).catch(() => {})
   }, [farmaciaId])
 
-  const emptyForm = { nombre: '', concentracion: '', stock_actual: '', precio: '', unidad_medida: 'Tabletas', especificaciones: '', foto_url: '', categoria: '' }
+  useEffect(() => { loadProducts(1, search) }, [search, loadProducts])
+  useEffect(() => { loadProducts() }, [loadProducts])
+  useEffect(() => { const timer = setTimeout(() => setSearch(searchInput), 400); return () => clearTimeout(timer) }, [searchInput])
+
+  const emptyForm = { nombre: '', concentracion: '', stock_actual: '', stock_minimo: '10', precio: '', unidad_medida: 'Tabletas', especificaciones: '', foto_url: '', categoria: '' }
   const [form, setForm] = useState({ ...emptyForm })
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return products
-    const q = search.toLowerCase()
-    return products.filter(p =>
-      String(p.id_producto).includes(q) ||
-      p.nombre.toLowerCase().includes(q) ||
-      (p.concentracion || '').toLowerCase().includes(q)
-    )
-  }, [products, search])
-
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
-  }
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
 
   const handleFileUpload = async (file) => {
     if (!file) return
     setUploading(true)
-    try {
-      const result = await uploadFile(file)
-      setForm(prev => ({ ...prev, foto_url: result.url }))
-    } catch {
-      alert('Error al subir la imagen')
-    }
+    try { const result = await uploadFile(file); setForm(prev => ({ ...prev, foto_url: result.url })) }
+    catch { alert('Error al subir la imagen') }
     setUploading(false)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     const stock = parseInt(form.stock_actual, 10)
+    const stockMinimo = parseInt(form.stock_minimo, 10) || 10
     const precio = parseFloat(form.precio)
     if (!form.nombre || isNaN(stock) || isNaN(precio)) return
-
-    const payload = {
-      nombre: form.nombre,
-      concentracion: form.concentracion,
-      categoria: form.categoria,
-      unidad_medida: form.unidad_medida,
-      precio,
-      stock_actual: stock,
-      especificaciones: form.especificaciones,
-      foto_url: form.foto_url,
-    }
-
+    const payload = { nombre: form.nombre, concentracion: form.concentracion, categoria: form.categoria, unidad_medida: form.unidad_medida, precio, stock_actual: stock, stock_minimo: stockMinimo, especificaciones: form.especificaciones, foto_url: form.foto_url }
     try {
-      if (editProduct) {
-        await updateProducto(editProduct.id_producto, payload)
-        setProducts(prev => prev.map(p => p.id_producto === editProduct.id_producto ? { ...p, ...payload } : p))
-      } else {
-        payload.id_farmacia = farmaciaId
-        const created = await createProducto(payload)
-        setProducts(prev => [...prev, created])
-      }
-      setForm({ ...emptyForm })
-      setEditProduct(null)
-      setShowModal(false)
-    } catch (err) {
-      alert(err?.response?.data?.message || err?.response?.data?.error || 'Error al guardar')
-    }
+      if (editProduct) await updateProducto(editProduct.id_producto, payload)
+      else { payload.id_farmacia = farmaciaId; await createProducto(payload) }
+      setForm({ ...emptyForm }); setEditProduct(null); setShowModal(false)
+      loadProducts()
+    } catch (err) { alert(err?.response?.data?.message || err?.response?.data?.error || 'Error al guardar') }
   }
 
   const handleEdit = (product) => {
     setEditProduct(product)
-    setForm({
-      nombre: product.nombre,
-      concentracion: product.concentracion || '',
-      stock_actual: String(product.stock_actual),
-      precio: String(product.precio),
-      unidad_medida: product.unidad_medida || 'Tabletas',
-      especificaciones: product.especificaciones || '',
-      foto_url: product.foto_url || '',
-      categoria: product.categoria || '',
-    })
+    setForm({ nombre: product.nombre, concentracion: product.concentracion || '', stock_actual: String(product.stock_actual), stock_minimo: String(product.stock_minimo ?? 10), precio: String(product.precio), unidad_medida: product.unidad_medida || 'Tabletas', especificaciones: product.especificaciones || '', foto_url: product.foto_url || '', categoria: product.categoria || '' })
     setShowModal(true)
   }
 
   const handleDelete = async (id) => {
-    try {
-      await removeProducto(id)
-      setProducts(prev => prev.filter(p => p.id_producto !== id))
-      setConfirmDelete(null)
-    } catch (err) {
-      alert(err?.response?.data?.message || err?.response?.data?.error || 'Error al eliminar')
-    }
+    try { await removeProducto(id); setConfirmDelete(null); loadProducts() }
+    catch (err) { alert(err?.response?.data?.message || err?.response?.data?.error || 'Error al eliminar') }
   }
 
   return (
@@ -121,30 +84,15 @@ export default function InventoryPage({ user }) {
       <div className="card-hover bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 p-6">
         <LowStockAlert products={products} />
 
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">Inventario de Medicamentos</h3>
-          <button
-            onClick={() => setShowModal(true)}
-            className="bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.97]"
-          >
-            + Agregar Producto
-          </button>
-        </div>
-
-        <div className="relative mb-5">
-          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por codigo, nombre o concentracion..."
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white text-sm"
-          />
-          {search && (
-            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
-          )}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+          <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">Inventario de Medicamentos ({total})</h3>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              <input type="text" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Buscar producto..." className="pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white text-sm w-48" />
+            </div>
+            <button onClick={() => setShowModal(true)} className="bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.97]">+ Agregar Producto</button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -161,27 +109,17 @@ export default function InventoryPage({ user }) {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="py-12 text-center text-gray-400 text-sm">
-                    {search ? 'No se encontraron productos con ese criterio' : 'Sin productos en el inventario'}
-                  </td>
-                </tr>
+              {products.length === 0 ? (
+                <tr><td colSpan="7" className="py-12 text-center text-gray-400 text-sm">{search ? 'No se encontraron productos con ese criterio' : 'Sin productos en el inventario'}</td></tr>
               ) : (
-                filtered.map((item, i) => {
-                  const estado = getEstado(item.stock_actual)
+                products.map((item) => {
+                  const estado = getEstado(item.stock_actual, item.stock_minimo)
                   const isLow = estado === 'Bajo stock'
                   const isCrit = estado === 'Crítico'
                   return (
-                    <tr key={item.id_producto} className={`border-b border-gray-50 transition-colors animate-fade-in ${
-                      isCrit ? 'bg-red-50/60 hover:bg-red-100/60' : isLow ? 'bg-amber-50/60 hover:bg-amber-100/60' : 'hover:bg-blue-50/30'
-                    }`} style={{ animationDelay: `${i * 30}ms` }}>
+                    <tr key={item.id_producto} className={`border-b border-gray-50 transition-colors ${isCrit ? 'bg-red-50/60 hover:bg-red-100/60' : isLow ? 'bg-amber-50/60 hover:bg-amber-100/60' : 'hover:bg-blue-50/30'}`}>
                       <td className="py-2 pr-3">
-                        {item.foto_url ? (
-                          <img src={item.foto_url} alt={item.nombre} className="w-10 h-10 object-cover rounded-lg border border-gray-200" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-sky-100 to-blue-100 border border-gray-200 flex items-center justify-center text-xs font-bold text-sky-600">Rx</div>
-                        )}
+                        {item.foto_url ? <img src={item.foto_url} alt={item.nombre} className="w-10 h-10 object-cover rounded-lg border border-gray-200" /> : <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-sky-100 to-blue-100 border border-gray-200 flex items-center justify-center text-xs font-bold text-sky-600">Rx</div>}
                       </td>
                       <td className="py-3 pr-4 text-blue-600 font-semibold">{item.id_producto}</td>
                       <td className="py-3 pr-4 text-gray-800 font-medium">{item.nombre} {item.concentracion}</td>
@@ -190,16 +128,8 @@ export default function InventoryPage({ user }) {
                       <td className="py-3"><Badge text={estado} /></td>
                       <td className="py-3">
                         <div className="flex items-center gap-1">
-                          <button onClick={() => handleEdit(item)} className="p-1.5 rounded-lg hover:bg-blue-100 text-blue-600 transition-colors" title="Editar">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          <button onClick={() => setConfirmDelete(item.id_producto)} className="p-1.5 rounded-lg hover:bg-red-100 text-red-500 transition-colors" title="Eliminar">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
+                          <button onClick={() => handleEdit(item)} className="p-1.5 rounded-lg hover:bg-blue-100 text-blue-600 transition-colors" title="Editar"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
+                          <button onClick={() => setConfirmDelete(item.id_producto)} className="p-1.5 rounded-lg hover:bg-red-100 text-red-500 transition-colors" title="Eliminar"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                         </div>
                       </td>
                     </tr>
@@ -209,6 +139,19 @@ export default function InventoryPage({ user }) {
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
+            <p className="text-xs text-gray-500">Mostrando página {page} de {totalPages} ({total} productos)</p>
+            <div className="flex items-center gap-1">
+              <button onClick={() => loadProducts(page - 1, search)} disabled={page <= 1} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">Anterior</button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                <button key={p} onClick={() => loadProducts(p, search)} className={`w-9 h-9 rounded-lg text-sm font-bold transition-all ${p === page ? 'bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-gray-600 hover:bg-gray-100'}`}>{p}</button>
+              ))}
+              <button onClick={() => loadProducts(page + 1, search)} disabled={page >= totalPages} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">Siguiente</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {showModal && (
@@ -219,65 +162,27 @@ export default function InventoryPage({ user }) {
               <button onClick={() => { setShowModal(false); setEditProduct(null); setForm({ ...emptyForm }) }} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Nombre del producto</label>
-                <input name="nombre" value={form.nombre} onChange={handleChange} placeholder="Ej. Atorvastatina" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" required />
-              </div>
-
+              <div><label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Nombre del producto</label><input name="nombre" value={form.nombre} onChange={handleChange} placeholder="Ej. Atorvastatina" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" required /></div>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Concentracion</label>
-                  <input name="concentracion" value={form.concentracion} onChange={handleChange} placeholder="Ej. 400mg" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Categoria</label>
-                  <input name="categoria" value={form.categoria} onChange={handleChange} placeholder="Ej. Analgesicos" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Forma farmaceutica</label>
-                  <select name="unidad_medida" value={form.unidad_medida} onChange={handleChange} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm">
-                    {unidades.map(u => <option key={u} value={u}>{u}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Stock</label>
-                  <input name="stock_actual" type="number" min="0" value={form.stock_actual} onChange={handleChange} placeholder="0" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" required />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Precio (Bs.)</label>
-                  <input name="precio" type="number" step="0.01" min="0" value={form.precio} onChange={handleChange} placeholder="0" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" required />
-                </div>
+                <div><label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Concentracion</label><input name="concentracion" value={form.concentracion} onChange={handleChange} placeholder="Ej. 400mg" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" /></div>
+                <div><label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Categoria</label><input name="categoria" value={form.categoria} onChange={handleChange} placeholder="Ej. Analgesicos" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" /></div>
+                <div><label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Forma farmaceutica</label><select name="unidad_medida" value={form.unidad_medida} onChange={handleChange} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm">{unidades.map(u => <option key={u} value={u}>{u}</option>)}</select></div>
+                <div><label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Stock</label><input name="stock_actual" type="number" min="0" value={form.stock_actual} onChange={handleChange} placeholder="0" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" required /></div>
+                <div><label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Stock Mínimo</label><input name="stock_minimo" type="number" min="1" value={form.stock_minimo} onChange={handleChange} placeholder="10" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" required /></div>
+                <div><label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Precio (Bs.)</label><input name="precio" type="number" step="0.01" min="0" value={form.precio} onChange={handleChange} placeholder="0" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" required /></div>
               </div>
-
-              <div>
-                <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Especificaciones</label>
-                <textarea name="especificaciones" value={form.especificaciones} onChange={handleChange} rows="3" placeholder="Indicaciones, contraindicaciones..." className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm resize-none" />
-              </div>
-
+              <div><label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Especificaciones</label><textarea name="especificaciones" value={form.especificaciones} onChange={handleChange} rows="3" placeholder="Indicaciones, contraindicaciones..." className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm resize-none" /></div>
               <div>
                 <label className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-1 block">Foto del producto</label>
                 <div className="flex items-center gap-3">
-                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}
-                    className="px-4 py-2.5 bg-gradient-to-r from-sky-600 to-blue-700 text-white text-sm font-semibold rounded-xl shadow-md hover:shadow-lg transition-all disabled:opacity-50">
-                    {uploading ? 'Subiendo...' : 'Seleccionar imagen'}
-                  </button>
-                  {form.foto_url && (
-                    <div className="flex items-center gap-2">
-                      <img src={form.foto_url} alt="preview" className="w-10 h-10 object-cover rounded-lg border border-gray-200" />
-                      <button type="button" onClick={() => setForm({ ...form, foto_url: '' })} className="text-red-500 hover:text-red-700 text-xs font-semibold">Eliminar</button>
-                    </div>
-                  )}
+                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="px-4 py-2.5 bg-gradient-to-r from-sky-600 to-blue-700 text-white text-sm font-semibold rounded-xl shadow-md hover:shadow-lg transition-all disabled:opacity-50">{uploading ? 'Subiendo...' : 'Seleccionar imagen'}</button>
+                  {form.foto_url && <div className="flex items-center gap-2"><img src={form.foto_url} alt="preview" className="w-10 h-10 object-cover rounded-lg border border-gray-200" /><button type="button" onClick={() => setForm({ ...form, foto_url: '' })} className="text-red-500 hover:text-red-700 text-xs font-semibold">Eliminar</button></div>}
                   <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }} />
                 </div>
               </div>
-
               <div className="flex gap-3 pt-2">
-                <button type="submit" className="flex-1 bg-gradient-to-r from-sky-600 to-blue-700 text-white font-semibold py-2.5 rounded-xl text-sm shadow-md">
-                  {editProduct ? 'Guardar Cambios' : 'Agregar'}
-                </button>
-                <button type="button" onClick={() => { setShowModal(false); setEditProduct(null); setForm({ ...emptyForm }) }} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl text-sm">
-                  Cancelar
-                </button>
+                <button type="submit" className="flex-1 bg-gradient-to-r from-sky-600 to-blue-700 text-white font-semibold py-2.5 rounded-xl text-sm shadow-md">{editProduct ? 'Guardar Cambios' : 'Agregar'}</button>
+                <button type="button" onClick={() => { setShowModal(false); setEditProduct(null); setForm({ ...emptyForm }) }} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl text-sm">Cancelar</button>
               </div>
             </form>
           </div>
@@ -300,37 +205,22 @@ export default function InventoryPage({ user }) {
 }
 
 function LowStockAlert({ products }) {
-  const bajos = products.filter(p => getEstado(p.stock_actual) === 'Bajo stock')
-  const criticos = products.filter(p => getEstado(p.stock_actual) === 'Crítico')
+  const bajos = products.filter(p => getEstado(p.stock_actual, p.stock_minimo) === 'Bajo stock')
+  const criticos = products.filter(p => getEstado(p.stock_actual, p.stock_minimo) === 'Crítico')
   const total = bajos.length + criticos.length
   if (total === 0) return null
-
   return (
     <div className="mb-5 space-y-2 animate-fade-in">
       {criticos.length > 0 && (
         <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-3.5 shadow-sm">
-          <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
-          <div className="text-sm text-red-800 font-semibold">
-            <strong className="text-red-700">{criticos.length} producto{criticos.length !== 1 ? 's' : ''}</strong> en estado <strong>Crítico</strong>
-            <span className="font-normal text-red-600 block text-xs mt-0.5">Requiere reposición inmediata</span>
-          </div>
+          <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center shrink-0"><svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg></div>
+          <div className="text-sm text-red-800 font-semibold"><strong className="text-red-700">{criticos.length} producto{criticos.length !== 1 ? 's' : ''}</strong> en estado <strong>Crítico</strong><span className="font-normal text-red-600 block text-xs mt-0.5">Requiere reposición inmediata</span></div>
         </div>
       )}
       {bajos.length > 0 && (
         <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3.5 shadow-sm">
-          <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div className="text-sm text-amber-800 font-semibold">
-            <strong className="text-amber-700">{bajos.length} producto{bajos.length !== 1 ? 's' : ''}</strong> con <strong>Stock Bajo</strong>
-            <span className="font-normal text-amber-600 block text-xs mt-0.5">Considera realizar un nuevo pedido</span>
-          </div>
+          <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0"><svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
+          <div className="text-sm text-amber-800 font-semibold"><strong className="text-amber-700">{bajos.length} producto{bajos.length !== 1 ? 's' : ''}</strong> con <strong>Stock Bajo</strong><span className="font-normal text-amber-600 block text-xs mt-0.5">Considera realizar un nuevo pedido</span></div>
         </div>
       )}
     </div>

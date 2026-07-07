@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getPedidos } from '../../api'
 
 function formatCurrency(n) {
@@ -10,48 +10,37 @@ function formatCurrency(n) {
 function formatFecha(iso) {
   if (!iso) return ''
   const d = new Date(iso)
-  return d.toLocaleDateString('es-ES', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: true,
-  })
+  return d.toLocaleDateString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true })
 }
+
+const PAGE_SIZE = 10
 
 export default function PurchaseHistoryPage({ user }) {
   const [selected, setSelected] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [pedidos, setPedidos] = useState([])
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
 
-  useEffect(() => {
-    getPedidos()
+  const loadPedidos = useCallback((p = 1) => {
+    getPedidos({ page: p, limit: PAGE_SIZE, search: searchQuery || undefined })
       .then(data => {
         if (Array.isArray(data)) setPedidos(data)
         else if (data?.pedidos) setPedidos(data.pedidos)
+        else if (data?.data) { setPedidos(data.data); setTotal(data.total || 0); setTotalPages(data.totalPages || 1); setPage(data.page || 1) }
       })
       .catch(() => setPedidos([]))
-  }, [])
+  }, [searchQuery])
 
-  const purchases = useMemo(() => {
-    let items = [...pedidos].sort((a, b) => {
-      const dateA = new Date(a.fecha_creacion || 0)
-      const dateB = new Date(b.fecha_creacion || 0)
-      return dateB - dateA
-    })
+  useEffect(() => { loadPedidos(1) }, [loadPedidos])
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      items = items.filter(o =>
-        String(o.id_pedido).includes(q) ||
-        (o.farmacia?.nombre_comercial || '').toLowerCase().includes(q)
-      )
-    }
-
-    return items
-  }, [pedidos, searchQuery])
+  const purchases = pedidos
 
   const order = selected ? pedidos.find(o => o.id_pedido === selected) : null
   const profile = order?.farmacia || null
 
-  const totalPurchases = pedidos.length
+  const totalPurchases = total
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
@@ -130,6 +119,16 @@ export default function PurchaseHistoryPage({ user }) {
               )
             })}
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-1 pt-2">
+              <button onClick={() => loadPedidos(page - 1)} disabled={page <= 1} className="px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">Anterior</button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                <button key={p} onClick={() => loadPedidos(p)} className={`w-9 h-9 rounded-lg text-sm font-bold transition-all ${p === page ? 'bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-600 hover:bg-slate-100'}`}>{p}</button>
+              ))}
+              <button onClick={() => loadPedidos(page + 1)} disabled={page >= totalPages} className="px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">Siguiente</button>
+            </div>
+          )}
 
           <div className="bg-white rounded-3xl border border-slate-100 p-6 lg:sticky lg:top-6 h-fit">
             {order ? (

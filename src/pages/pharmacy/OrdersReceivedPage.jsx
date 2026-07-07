@@ -108,8 +108,8 @@ export default function OrdersReceivedPage({ user }) {
   }, [farmaciaId])
 
   function loadOrders() {
-    getPedidos({ id_farmacia: farmaciaId }).then(data => {
-      const list = Array.isArray(data) ? data : (data?.pedidos || [])
+    getPedidos({ id_farmacia: farmaciaId, limit: 1000 }).then(data => {
+      const list = Array.isArray(data) ? data : (data?.pedidos || data?.data || [])
       setPedidos(list)
     }).catch(() => {})
   }

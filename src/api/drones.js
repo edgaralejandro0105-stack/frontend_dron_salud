@@ -1,7 +1,7 @@
 import api from './client'
 
-export const getDrones = () =>
-  api.get('/drones').then(r => r.data)
+export const getDrones = ({ search, page, limit } = {}) =>
+  api.get('/drones', { params: { search, page, limit } }).then(r => r.data)
 
 export const getDronesDisponibles = () =>
   api.get('/drones/disponibles').then(r => r.data)

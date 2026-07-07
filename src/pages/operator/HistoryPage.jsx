@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getPedidos } from '../../api'
 import Badge from '../../components/ui/Badge'
 
@@ -8,28 +8,28 @@ function formatCurrency(n) {
   return 'Bs. ' + num.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+const PAGE_SIZE = 10
+
 export default function OperatorHistoryPage() {
   const [pedidos, setPedidos] = useState([])
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
   const [selected, setSelected] = useState(null)
 
-  useEffect(() => {
-    getPedidos()
+  const loadPedidos = useCallback((p = 1) => {
+    getPedidos({ estado_pedido: 'Entregado', page: p, limit: PAGE_SIZE })
       .then(data => {
-        const list = Array.isArray(data) ? data : (data?.pedidos || [])
-        setPedidos(list)
+        if (Array.isArray(data)) setPedidos(data)
+        else if (data?.pedidos) setPedidos(data.pedidos)
+        else if (data?.data) { setPedidos(data.data); setTotal(data.total || 0); setTotalPages(data.totalPages || 1); setPage(data.page || 1) }
       })
       .catch(() => {})
   }, [])
 
-  const deliveredOrders = useMemo(
-    () => pedidos.filter((o) => o.estado_pedido === 'Entregado'),
-    [pedidos]
-  )
+  useEffect(() => { loadPedidos() }, [loadPedidos])
 
-  const order = selected
-    ? pedidos.find((o) => o.id_pedido === selected)
-    : null
-
+  const order = selected ? pedidos.find((o) => o.id_pedido === selected) : null
   const farmacia = order?.farmacia || null
 
   return (
@@ -38,7 +38,7 @@ export default function OperatorHistoryPage() {
         <div>
           <h2 className="text-xl font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Historial de Entregas</h2>
           <p className="text-sm text-gray-500 mt-1">
-            {deliveredOrders.length} pedido{deliveredOrders.length !== 1 ? 's' : ''} entregado{deliveredOrders.length !== 1 ? 's' : ''}
+            {total} pedido{total !== 1 ? 's' : ''} entregado{total !== 1 ? 's' : ''}
           </p>
         </div>
       </div>
@@ -56,14 +56,14 @@ export default function OperatorHistoryPage() {
                 </tr>
               </thead>
               <tbody>
-                {deliveredOrders.length === 0 ? (
+                {pedidos.length === 0 ? (
                   <tr>
                     <td colSpan="4" className="py-12 text-center text-gray-400 text-sm">
                       No hay entregas registradas
                     </td>
                   </tr>
                 ) : (
-                  deliveredOrders.map((o, i) => (
+                  pedidos.map((o, i) => (
                     <tr
                       key={o.id_pedido}
                       onClick={() => setSelected(selected === o.id_pedido ? null : o.id_pedido)}
@@ -81,6 +81,19 @@ export default function OperatorHistoryPage() {
               </tbody>
             </table>
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
+              <p className="text-xs text-gray-500">Mostrando página {page} de {totalPages} ({total} entregas)</p>
+              <div className="flex items-center gap-1">
+                <button onClick={() => loadPedidos(page - 1)} disabled={page <= 1} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">Anterior</button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                  <button key={p} onClick={() => loadPedidos(p)} className={`w-9 h-9 rounded-lg text-sm font-bold transition-all ${p === page ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/20' : 'text-gray-600 hover:bg-gray-100'}`}>{p}</button>
+                ))}
+                <button onClick={() => loadPedidos(page + 1)} disabled={page >= totalPages} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">Siguiente</button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 p-6">

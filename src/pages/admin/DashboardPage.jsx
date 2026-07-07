@@ -58,16 +58,20 @@ export default function DashboardPage() {
   const [usuarios, setUsuarios] = useState([])
 
   useEffect(() => {
-    Promise.all([getPedidos(), getDrones(), getFarmacias(), getUsuarios()])
+    Promise.all([getPedidos({ limit: 10000 }), getDrones({ limit: 1000 }), getFarmacias({ limit: 1000 }), getUsuarios({ limit: 1000 })])
       .then(([p, d, f, u]) => {
         if (Array.isArray(p)) setPedidos(p)
         else if (p?.pedidos) setPedidos(p.pedidos)
+        else if (p?.data) setPedidos(p.data)
         if (Array.isArray(d)) setDrones(d)
         else if (d?.drones) setDrones(d.drones)
+        else if (d?.data) setDrones(d.data)
         if (Array.isArray(f)) setFarmacias(f)
         else if (f?.farmacias) setFarmacias(f.farmacias)
+        else if (f?.data) setFarmacias(f.data)
         if (Array.isArray(u)) setUsuarios(u)
         else if (u?.usuarios) setUsuarios(u.usuarios)
+        else if (u?.data) setUsuarios(u.data)
       })
       .catch(() => {})
   }, [])

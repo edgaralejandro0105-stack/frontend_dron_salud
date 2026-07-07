@@ -81,16 +81,17 @@ export default function ReportsPage() {
   useEffect(() => {
     let cancelled = false
     setCargando(true)
-    const params = {}
+    const params = { limit: 10000 }
     if (filtroDesde) params.desde = filtroDesde
     if (filtroHasta) params.hasta = filtroHasta
     if (filtroFarmacia) params.id_farmacia = filtroFarmacia
 
-    getPedidos(params)
+     getPedidos(params)
       .then(p => {
         if (!cancelled) {
           if (Array.isArray(p)) setPedidos(p)
           else if (p?.pedidos) setPedidos(p.pedidos)
+          else if (p?.data) setPedidos(p.data)
         }
       })
       .catch(err => {
@@ -100,25 +101,15 @@ export default function ReportsPage() {
         if (!cancelled) setCargando(false)
       })
 
-    getDrones()
-      .then(d => {
-        if (!cancelled) {
-          if (Array.isArray(d)) setDrones(d)
-          else if (d?.drones) setDrones(d.drones)
-        }
-      })
-      .catch(err => {
-        if (!cancelled) console.error('Error al cargar drones:', err)
-      })
-
     return () => { cancelled = true }
   }, [filtroDesde, filtroHasta, filtroFarmacia])
 
   useEffect(() => {
-    getDrones()
+    getDrones({ limit: 1000 })
       .then(d => {
         if (Array.isArray(d)) setDrones(d)
         else if (d?.drones) setDrones(d.drones)
+        else if (d?.data) setDrones(d.data)
       })
       .catch((err) => {
         console.error('Error al cargar drones:', err)
@@ -126,10 +117,11 @@ export default function ReportsPage() {
   }, [])
 
   useEffect(() => {
-    getFarmacias()
+    getFarmacias({ limit: 1000 })
       .then(f => {
         if (Array.isArray(f)) setFarmacias(f)
         else if (f?.farmacias) setFarmacias(f.farmacias)
+        else if (f?.data) setFarmacias(f.data)
       })
       .catch(err => {
         console.error('Error al cargar farmacias:', err)

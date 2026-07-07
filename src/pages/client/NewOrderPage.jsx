@@ -659,8 +659,8 @@ export default function NewOrderPage({ user }) {
   const [cartOpen, setCartOpen] = useState(false)
 
   useEffect(() => {
-    getFarmacias().then(data => {
-      const list = Array.isArray(data) ? data : data?.farmacias || []
+    getFarmacias({ limit: 1000 }).then(data => {
+      const list = Array.isArray(data) ? data : (data?.farmacias || data?.data || [])
       setFarmacias(list)
     }).catch(() => {})
     getConfiguracion('cargo_dron').then(c => {
@@ -684,8 +684,8 @@ export default function NewOrderPage({ user }) {
   useEffect(() => {
     if (selectedPharmacy) {
       setLoadingCatalog(true)
-      getProductos({ id_farmacia: selectedPharmacy.id_farmacia })
-        .then(setCatalog)
+      getProductos({ id_farmacia: selectedPharmacy.id_farmacia, limit: 1000 })
+        .then(d => setCatalog(Array.isArray(d) ? d : (d?.data || [])))
         .catch(() => setCatalog([]))
         .finally(() => setLoadingCatalog(false))
     } else {

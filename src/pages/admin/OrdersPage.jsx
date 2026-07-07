@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
-import { getPedidos, getFarmacias, getOperadores } from '../../api'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { getPedidos, getFarmacias, getOperadores, getUsuarios } from '../../api'
 import Badge from '../../components/ui/Badge'
 
 function formatCurrency(n) {
@@ -8,65 +8,74 @@ function formatCurrency(n) {
   return 'Bs. ' + num.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+const PAGE_SIZE = 10
+
 export default function OrdersPage() {
   const [selected, setSelected] = useState(null)
-  const [filtroFechaDesde, setFiltroFechaDesde] = useState('')
-  const [filtroFechaHasta, setFiltroFechaHasta] = useState('')
+  const [filtroFecha, setFiltroFecha] = useState('')
   const [filtroFarmacia, setFiltroFarmacia] = useState('')
   const [pedidos, setPedidos] = useState([])
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
   const [farmacias, setFarmacias] = useState([])
   const [operadores, setOperadores] = useState([])
+  const [admins, setAdmins] = useState([])
   const [filtroOperador, setFiltroOperador] = useState('')
-
   const [cargando, setCargando] = useState(false)
 
   useEffect(() => {
-    Promise.all([getFarmacias(), getOperadores()])
-      .then(([f, o]) => {
+    Promise.all([
+      getFarmacias({ limit: 1000 }),
+      getOperadores({ limit: 1000 }),
+      getUsuarios({ tipo: 'admin', limit: 1000 }),
+    ])
+      .then(([f, o, a]) => {
         if (Array.isArray(f)) setFarmacias(f)
         else if (f?.farmacias) setFarmacias(f.farmacias)
+        else if (f?.data) setFarmacias(f.data)
         if (Array.isArray(o)) setOperadores(o)
         else if (o?.operadores) setOperadores(o.operadores)
+        else if (o?.data) setOperadores(o.data)
+        if (Array.isArray(a)) setAdmins(a)
+        else if (a?.usuarios) setAdmins(a.usuarios)
+        else if (a?.data) setAdmins(a.data)
       })
-      .catch((err) => {
-        console.error('Error al cargar farmacias/operadores:', err)
-      })
+      .catch(() => {})
   }, [])
 
-  useEffect(() => {
+  const loadPedidos = useCallback((p = 1) => {
     setCargando(true)
-    const params = {}
-    if (filtroFechaDesde) params.desde = filtroFechaDesde
-    if (filtroFechaHasta) params.hasta = filtroFechaHasta
+    const params = { page: p, limit: PAGE_SIZE }
+    if (filtroFecha) {
+      params.desde = filtroFecha
+      params.hasta = filtroFecha
+    }
+    if (filtroFarmacia) params.id_farmacia = filtroFarmacia
+    if (filtroOperador) {
+      if (filtroOperador.startsWith('op_')) {
+        params.id_operador = filtroOperador.replace('op_', '')
+      } else if (filtroOperador.startsWith('adm_')) {
+        params.id_usuario_despacho = filtroOperador.replace('adm_', '')
+      }
+    }
 
     getPedidos(params)
-      .then((p) => {
-        if (Array.isArray(p)) setPedidos(p)
-        else if (p?.pedidos) setPedidos(p.pedidos)
+      .then((pkg) => {
+        if (Array.isArray(pkg)) setPedidos(pkg)
+        else if (pkg?.pedidos) setPedidos(pkg.pedidos)
+        else if (pkg?.data) {
+          setPedidos(pkg.data)
+          setTotal(pkg.total || 0)
+          setTotalPages(pkg.totalPages || 1)
+          setPage(pkg.page || 1)
+        }
       })
-      .catch((err) => {
-        console.error('Error al cargar pedidos:', err)
-      })
+      .catch(() => {})
       .finally(() => setCargando(false))
-  }, [filtroFechaDesde, filtroFechaHasta])
+  }, [filtroFecha, filtroFarmacia, filtroOperador])
 
-  const filteredOrders = useMemo(() => {
-    return pedidos.filter(order => {
-      if (filtroFarmacia) {
-        const farmacia = farmacias.find(f => f.id_farmacia === order.id_farmacia)
-        if (farmacia?.nombre_comercial !== filtroFarmacia) return false
-      }
-      if (filtroOperador) {
-        const opName = order.operador
-          ? `${order.operador.nombre_operador || order.operador.nombre || ''} ${order.operador.apellido || ''}`.trim()
-          : order.despachador
-            ? `${order.despachador.nombre || ''} ${order.despachador.apellido || ''}`.trim()
-            : ''
-        if (opName !== filtroOperador) return false
-      }
-      return true
-    })
-  }, [pedidos, filtroFechaDesde, filtroFechaHasta, filtroFarmacia, filtroOperador, farmacias])
+  useEffect(() => { loadPedidos(1) }, [loadPedidos])
 
   const order = selected
     ? pedidos.find(o => o.id_pedido === selected)
@@ -89,20 +98,11 @@ export default function OrdersPage() {
           )}
           <div className="flex flex-wrap items-end gap-3 mb-5">
             <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">Desde</label>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">Fecha</label>
               <input
                 type="date"
-                value={filtroFechaDesde}
-                onChange={e => setFiltroFechaDesde(e.target.value)}
-                className="bg-gray-50 border border-gray-200 text-gray-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">Hasta</label>
-              <input
-                type="date"
-                value={filtroFechaHasta}
-                onChange={e => setFiltroFechaHasta(e.target.value)}
+                value={filtroFecha}
+                onChange={e => setFiltroFecha(e.target.value)}
                 className="bg-gray-50 border border-gray-200 text-gray-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500"
               />
             </div>
@@ -115,7 +115,7 @@ export default function OrdersPage() {
               >
                 <option value="">Todas</option>
                 {farmacias.map(p => (
-                  <option key={p.id_farmacia} value={p.nombre_comercial}>{p.nombre_comercial}</option>
+                  <option key={p.id_farmacia} value={p.id_farmacia}>{p.nombre_comercial}</option>
                 ))}
               </select>
             </div>
@@ -127,24 +127,21 @@ export default function OrdersPage() {
                 className="bg-gray-50 border border-gray-200 text-gray-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500"
               >
                 <option value="">Todos</option>
-                {[...new Map(
-                  pedidos
-                    .flatMap(o => {
-                      const names = []
-                      if (o.operador) names.push(`${o.operador.nombre_operador || o.operador.nombre || ''} ${o.operador.apellido || ''}`.trim())
-                      if (o.despachador) names.push(`${o.despachador.nombre || ''} ${o.despachador.apellido || ''}`.trim())
-                      return names
-                    })
-                    .filter(Boolean)
-                    .map(name => [name, name])
-                ).values()].map(name => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
+                <optgroup label="Operadores">
+                  {operadores.map(op => (
+                    <option key={`op_${op.id_operador}`} value={`op_${op.id_operador}`}>{op.nombre_operador} {op.apellido || ''}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Admin / Despachador">
+                  {admins.map(adm => (
+                    <option key={`adm_${adm.id_usuario}`} value={`adm_${adm.id_usuario}`}>{adm.nombre} {adm.apellido || ''}</option>
+                  ))}
+                </optgroup>
               </select>
             </div>
-            {(filtroFechaDesde || filtroFechaHasta || filtroFarmacia || filtroOperador) && (
+            {(filtroFecha || filtroFarmacia || filtroOperador) && (
               <button
-                onClick={() => { setFiltroFechaDesde(''); setFiltroFechaHasta(''); setFiltroFarmacia(''); setFiltroOperador('') }}
+                onClick={() => { setFiltroFecha(''); setFiltroFarmacia(''); setFiltroOperador('') }}
                 className="bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.97]"
               >
                 Limpiar
@@ -166,12 +163,12 @@ export default function OrdersPage() {
                 </tr>
               </thead>
               <tbody>
-                  {filteredOrders.length === 0 ? (
+                  {pedidos.length === 0 ? (
                   <tr>
                     <td colSpan="8" className="py-8 text-center text-sm text-gray-400 font-semibold">No se encontraron pedidos con los filtros seleccionados</td>
                   </tr>
                 ) : (
-                  filteredOrders.map((order, i) => (
+                  pedidos.map((order, i) => (
                   <tr
                     key={order.id_pedido}
                     onClick={() => setSelected(selected === order.id_pedido ? null : order.id_pedido)}
@@ -193,6 +190,19 @@ export default function OrdersPage() {
               </tbody>
             </table>
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
+              <p className="text-xs text-gray-500">Mostrando página {page} de {totalPages} ({total} pedidos)</p>
+              <div className="flex items-center gap-1">
+                <button onClick={() => loadPedidos(page - 1)} disabled={page <= 1} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">Anterior</button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                  <button key={p} onClick={() => loadPedidos(p)} className={`w-9 h-9 rounded-lg text-sm font-bold transition-all ${p === page ? 'bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-gray-600 hover:bg-gray-100'}`}>{p}</button>
+                ))}
+                <button onClick={() => loadPedidos(page + 1)} disabled={page >= totalPages} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">Siguiente</button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="card-hover bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100 p-6">

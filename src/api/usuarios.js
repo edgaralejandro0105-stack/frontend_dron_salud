@@ -1,7 +1,7 @@
 import api from './client'
 
-export const getUsuarios = (tipo) =>
-  api.get('/usuarios', { params: { tipo } }).then(r => r.data)
+export const getUsuarios = ({ tipo, search, page, limit } = {}) =>
+  api.get('/usuarios', { params: { tipo, search, page, limit } }).then(r => r.data)
 
 export const getUsuario = (id) =>
   api.get(`/usuarios/${id}`).then(r => r.data)

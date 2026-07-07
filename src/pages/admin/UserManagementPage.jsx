@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { getOperadores, createOperador, updateOperador, removeOperador, getFarmacias, createFarmacia, updateFarmacia, register, getUsuarios, updateUsuario, updateUsuarioEstado, getSuspensionesByUsuario, uploadFile } from '../../api'
+import { getOperadores, createOperador, updateOperador, removeOperador, getFarmacias, createFarmacia, updateFarmacia, removeFarmacia, register, getUsuarios, updateUsuario, updateUsuarioEstado, removeUsuario, getSuspensionesByUsuario } from '../../api'
+import Avatar from '../../components/ui/Avatar'
 
 const CENTER = { lat: 7.8247, lng: -72.3082 }
 const TACHIRA_BOUNDS = L.latLngBounds(L.latLng(7.3, -72.6), L.latLng(8.5, -71.5))
@@ -30,7 +31,7 @@ function ClickMarker({ position, onMove }) {
 function MapBoundsController() {
   const map = useMap()
   useEffect(() => {
-    setTimeout(() => map.invalidateSize(), 100)
+    setTimeout(() => map.invalidateSize(), 200)
     map.setMaxBounds(TACHIRA_BOUNDS)
     map.on('drag', () => {
       if (!TACHIRA_BOUNDS.contains(map.getCenter())) {
@@ -43,14 +44,37 @@ function MapBoundsController() {
 
 const inputClass = 'w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 focus:bg-white transition-all duration-200 text-sm'
 const labelClass = 'text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5 block'
+const PAGE_SIZE = 10
 
 export default function UserManagementPage() {
   const [tab, setTab] = useState('operador')
   const [msg, setMsg] = useState(null)
   const [lastCredentials, setLastCredentials] = useState(null)
-  const [operadores, setOperadores] = useState([])
-  const [farmacias, setFarmacias] = useState([])
   const resolvingRef = useRef(false)
+
+  const [operadores, setOperadores] = useState([])
+  const [pageOp, setPageOp] = useState(1)
+  const [totalOp, setTotalOp] = useState(0)
+  const [totalPagesOp, setTotalPagesOp] = useState(1)
+  const [searchOp, setSearchOp] = useState('')
+  const [searchInputOp, setSearchInputOp] = useState('')
+  const [showOpForm, setShowOpForm] = useState(false)
+
+  const [farmacias, setFarmacias] = useState([])
+  const [pageFarm, setPageFarm] = useState(1)
+  const [totalFarm, setTotalFarm] = useState(0)
+  const [totalPagesFarm, setTotalPagesFarm] = useState(1)
+  const [searchFarm, setSearchFarm] = useState('')
+  const [searchInputFarm, setSearchInputFarm] = useState('')
+  const [showFarmForm, setShowFarmForm] = useState(false)
+
+  const [admins, setAdmins] = useState([])
+  const [pageAdmin, setPageAdmin] = useState(1)
+  const [totalAdmin, setTotalAdmin] = useState(0)
+  const [totalPagesAdmin, setTotalPagesAdmin] = useState(1)
+  const [searchAdmin, setSearchAdmin] = useState('')
+  const [searchInputAdmin, setSearchInputAdmin] = useState('')
+  const [showAdminForm, setShowAdminForm] = useState(false)
 
   const [opForm, setOpForm] = useState({
     nombre: '', apellido: '', correo: '', cedula: '', licencia: '', horas_vuelo: '', telefono: '', vencimiento_licencia: '', foto_url: ''
@@ -68,7 +92,6 @@ export default function UserManagementPage() {
   const editFarmResolvingRef = useRef(false)
 
   const [confirmDelete, setConfirmDelete] = useState(null)
-  const [admins, setAdmins] = useState([])
 
   const [adminForm, setAdminForm] = useState({
     nombre: '', apellido: '', cedula: '', email: '', password: '', telefono: ''
@@ -82,32 +105,55 @@ export default function UserManagementPage() {
   const [farmSuspendModal, setFarmSuspendModal] = useState(null)
   const [farmSuspendReason, setFarmSuspendReason] = useState('')
   const [farmUsuariosMap, setFarmUsuariosMap] = useState({})
-  const [uploadingOpPhoto, setUploadingOpPhoto] = useState(false)
-  const [uploadingNewOpPhoto, setUploadingNewOpPhoto] = useState(false)
-  const [uploadingAdminPhoto, setUploadingAdminPhoto] = useState(false)
-  const opPhotoRef = useRef(null)
-  const newOpPhotoRef = useRef(null)
-  const adminPhotoRef = useRef(null)
+  const [expandedPhoto, setExpandedPhoto] = useState(null)
 
-  useEffect(() => {
-    getOperadores().then(data => {
-      if (Array.isArray(data)) setOperadores(data)
-      else if (data?.operadores) setOperadores(data.operadores)
+  const loadOperadores = useCallback((p = 1, s = '') => {
+    getOperadores({ search: s || undefined, page: p, limit: PAGE_SIZE }).then(data => {
+      setOperadores(data.data || [])
+      setTotalOp(data.total || 0)
+      setTotalPagesOp(data.totalPages || 1)
+      setPageOp(data.page || 1)
     }).catch(() => {})
-    getFarmacias().then(data => {
-      if (Array.isArray(data)) setFarmacias(data)
-      else if (data?.farmacias) setFarmacias(data.farmacias)
+  }, [])
+
+  const loadFarmacias = useCallback((p = 1, s = '') => {
+    getFarmacias({ search: s || undefined, page: p, limit: PAGE_SIZE }).then(data => {
+      setFarmacias(data.data || [])
+      setTotalFarm(data.total || 0)
+      setTotalPagesFarm(data.totalPages || 1)
+      setPageFarm(data.page || 1)
     }).catch(() => {})
-    getUsuarios('admin').then(data => {
-      if (Array.isArray(data)) setAdmins(data)
+  }, [])
+
+  const loadAdmins = useCallback((p = 1, s = '') => {
+    getUsuarios({ tipo: 'admin', search: s || undefined, page: p, limit: PAGE_SIZE }).then(data => {
+      setAdmins(data.data || [])
+      setTotalAdmin(data.total || 0)
+      setTotalPagesAdmin(data.totalPages || 1)
+      setPageAdmin(data.page || 1)
     }).catch(() => {})
-    getUsuarios('farmacia').then(data => {
-      const arr = Array.isArray(data) ? data : data?.usuarios || []
+  }, [])
+
+  const loadFarmUsuarios = useCallback(() => {
+    getUsuarios({ tipo: 'farmacia', limit: 1000 }).then(data => {
+      const arr = data.data || data || []
       const map = {}
       arr.forEach(u => { if (u.id_farmacia) map[u.id_farmacia] = u })
       setFarmUsuariosMap(map)
     }).catch(() => {})
   }, [])
+
+  useEffect(() => { loadOperadores(1, searchOp) }, [searchOp, loadOperadores])
+  useEffect(() => { loadOperadores() }, [loadOperadores])
+  useEffect(() => { loadFarmacias(1, searchFarm) }, [searchFarm, loadFarmacias])
+  useEffect(() => { loadFarmacias() }, [loadFarmacias])
+  useEffect(() => { loadAdmins(1, searchAdmin) }, [searchAdmin, loadAdmins])
+  useEffect(() => { loadAdmins() }, [loadAdmins])
+  useEffect(() => { loadFarmUsuarios() }, [loadFarmUsuarios])
+
+  useEffect(() => { const timer = setTimeout(() => setSearchOp(searchInputOp), 400); return () => clearTimeout(timer) }, [searchInputOp])
+  useEffect(() => { const timer = setTimeout(() => setSearchFarm(searchInputFarm), 400); return () => clearTimeout(timer) }, [searchInputFarm])
+  useEffect(() => { const timer = setTimeout(() => setSearchAdmin(searchInputAdmin), 400); return () => clearTimeout(timer) }, [searchInputAdmin])
 
   useEffect(() => {
     if (!markerPos || resolvingRef.current) return
@@ -139,6 +185,11 @@ export default function UserManagementPage() {
       .finally(() => { editFarmResolvingRef.current = false })
   }, [editFarmMarkerPos])
 
+  function showMsg(text) {
+    setMsg(text)
+    setTimeout(() => setMsg(null), 5000)
+  }
+
   async function handleOpSubmit(e) {
     e.preventDefault()
     if (!opForm.nombre || !opForm.correo || !opForm.cedula || !opForm.licencia) return
@@ -163,16 +214,12 @@ export default function UserManagementPage() {
         horas_vuelo: opForm.horas_vuelo ? Number(opForm.horas_vuelo) : 0,
       })
       setLastCredentials({ email: opForm.correo, password: opForm.cedula + 'Drone' })
-      setMsg('Operador ' + opForm.nombre + ' ' + opForm.apellido + ' registrado correctamente')
+      showMsg('Operador ' + opForm.nombre + ' ' + opForm.apellido + ' registrado correctamente')
       setOpForm({ nombre: '', apellido: '', correo: '', cedula: '', licencia: '', horas_vuelo: '', telefono: '', vencimiento_licencia: '' })
-      getOperadores().then(data => {
-        if (Array.isArray(data)) setOperadores(data)
-        else if (data?.operadores) setOperadores(data.operadores)
-      }).catch(() => {})
+      loadOperadores()
     } catch (err) {
-      setMsg('Error: ' + (err?.response?.data?.message || err?.response?.data?.error || 'Error al registrar'))
+      showMsg('Error: ' + (err?.response?.data?.message || err?.response?.data?.error || 'Error al registrar'))
     }
-    setTimeout(() => setMsg(null), 5000)
   }
 
   async function handleFarmSubmit(e) {
@@ -201,54 +248,40 @@ export default function UserManagementPage() {
         id_farmacia: farmacia.id_farmacia,
       })
       setLastCredentials({ email, password: farmForm.rif + 'Drone' })
-      setMsg('Farmacia ' + farmForm.nombre_comercial + ' registrada correctamente')
+      showMsg('Farmacia ' + farmForm.nombre_comercial + ' registrada correctamente')
       setFarmForm({ nombre_comercial: '', rif: '', direccion: '', correo: '', telefono: '', telefono_responsable: '', ciudad: '' })
       setMarkerPos(null)
-      getFarmacias().then(data => {
-        if (Array.isArray(data)) setFarmacias(data)
-        else if (data?.farmacias) setFarmacias(data.farmacias)
-      }).catch(() => {})
+      loadFarmacias()
+      loadFarmUsuarios()
     } catch (err) {
-      setMsg('Error: ' + (err?.response?.data?.message || err?.response?.data?.error || 'Error al registrar'))
+      showMsg('Error: ' + (err?.response?.data?.message || err?.response?.data?.error || 'Error al registrar'))
     }
-    setTimeout(() => setMsg(null), 5000)
   }
 
   async function toggleOpStatus(op) {
     try {
       await updateOperador(op.id_operador, { estado_disponibilidad: !op.estado_disponibilidad })
-      setMsg(`Operador ${op.estado_disponibilidad ? 'deshabilitado' : 'habilitado'} correctamente`)
-      getOperadores().then(data => setOperadores(Array.isArray(data) ? data : data?.operadores || [])).catch(() => {})
-    } catch (err) {
-      setMsg('Error: ' + (err?.response?.data?.message || 'Error al cambiar estado'))
-    }
-    setTimeout(() => setMsg(null), 4000)
+      showMsg(`Operador ${op.estado_disponibilidad ? 'deshabilitado' : 'habilitado'} correctamente`)
+      loadOperadores()
+    } catch (err) { showMsg('Error: ' + (err?.response?.data?.message || 'Error al cambiar estado')) }
   }
 
   async function toggleFarmStatus(farm) {
     try {
       await updateFarmacia(farm.id_farmacia, { estado_operativo: !farm.estado_operativo })
-      setMsg(`Farmacia ${farm.estado_operativo ? 'deshabilitada' : 'habilitada'} correctamente`)
-      getFarmacias().then(data => setFarmacias(Array.isArray(data) ? data : data?.farmacias || [])).catch(() => {})
-    } catch (err) {
-      setMsg('Error: ' + (err?.response?.data?.message || 'Error al cambiar estado'))
-    }
-    setTimeout(() => setMsg(null), 4000)
+      showMsg(`Farmacia ${farm.estado_operativo ? 'deshabilitada' : 'habilitada'} correctamente`)
+      loadFarmacias()
+    } catch (err) { showMsg('Error: ' + (err?.response?.data?.message || 'Error al cambiar estado')) }
   }
 
   function toggleFarmAccountStatus(farm) {
     const u = farmUsuariosMap[farm.id_farmacia]
-    if (!u) { setMsg('Esta farmacia no tiene usuario asociado'); setTimeout(() => setMsg(null), 4000); return }
+    if (!u) { showMsg('Esta farmacia no tiene usuario asociado'); return }
     if (u.estado_cuenta === 'Suspendido') {
       updateUsuarioEstado(u.id_usuario, 'Activo').then(() => {
-        setMsg('Farmacia activada correctamente')
-        getUsuarios('farmacia').then(data => {
-          const arr = Array.isArray(data) ? data : data?.usuarios || []
-          const map = {}; arr.forEach(u => { if (u.id_farmacia) map[u.id_farmacia] = u })
-          setFarmUsuariosMap(map)
-        }).catch(() => {})
-      }).catch(err => setMsg('Error: ' + (err?.response?.data?.message || 'Error al activar')))
-      setTimeout(() => setMsg(null), 4000)
+        showMsg('Farmacia activada correctamente')
+        loadFarmUsuarios()
+      }).catch(err => showMsg('Error: ' + (err?.response?.data?.message || 'Error al activar')))
       return
     }
     setFarmSuspendModal({ ...farm, usuario: u })
@@ -259,72 +292,63 @@ export default function UserManagementPage() {
     if (!farmSuspendModal || !farmSuspendReason.trim()) return
     try {
       await updateUsuarioEstado(farmSuspendModal.usuario.id_usuario, 'Suspendido', farmSuspendReason.trim())
-      setMsg('Farmacia suspendida correctamente')
+      showMsg('Farmacia suspendida correctamente')
       setFarmSuspendModal(null); setFarmSuspendReason('')
-      getUsuarios('farmacia').then(data => {
-        const arr = Array.isArray(data) ? data : data?.usuarios || []
-        const map = {}; arr.forEach(u => { if (u.id_farmacia) map[u.id_farmacia] = u })
-        setFarmUsuariosMap(map)
-      }).catch(() => {})
-    } catch (err) { setMsg('Error: ' + (err?.response?.data?.message || 'Error al suspender')) }
-    setTimeout(() => setMsg(null), 4000)
+      loadFarmUsuarios()
+    } catch (err) { showMsg('Error: ' + (err?.response?.data?.message || 'Error al suspender')) }
   }
 
   async function handleViewFarmSuspension(farm) {
     const u = farmUsuariosMap[farm.id_farmacia]
-    if (!u) { setMsg('No tiene usuario asociado'); setTimeout(() => setMsg(null), 4000); return }
+    if (!u) { showMsg('No tiene usuario asociado'); return }
     try { const data = await getSuspensionesByUsuario(u.id_usuario); setOpSuspensionInfo(data) }
-    catch { setMsg('Error al cargar suspensiones') }
+    catch { showMsg('Error al cargar suspensiones') }
   }
 
   function toggleOpAccountStatus(op) {
     if (op.usuario?.estado_cuenta === 'Activo' || !op.usuario?.estado_cuenta) { setOpSuspendModal(op); setOpSuspendReason(''); return }
     updateUsuarioEstado(op.id_usuario, 'Activo').then(() => {
-      setMsg('Operador activado correctamente')
-      getOperadores().then(data => setOperadores(Array.isArray(data) ? data : data?.operadores || [])).catch(() => {})
-    }).catch(err => setMsg('Error: ' + (err?.response?.data?.message || 'Error al activar')))
-    setTimeout(() => setMsg(null), 4000)
+      showMsg('Operador activado correctamente')
+      loadOperadores()
+    }).catch(err => showMsg('Error: ' + (err?.response?.data?.message || 'Error al activar')))
   }
 
   async function confirmSuspendOp() {
     if (!opSuspendModal || !opSuspendReason.trim()) return
     try {
       await updateUsuarioEstado(opSuspendModal.id_usuario, 'Suspendido', opSuspendReason.trim())
-      setMsg('Operador suspendido correctamente')
+      showMsg('Operador suspendido correctamente')
       setOpSuspendModal(null); setOpSuspendReason('')
-      getOperadores().then(data => setOperadores(Array.isArray(data) ? data : data?.operadores || [])).catch(() => {})
-    } catch (err) { setMsg('Error: ' + (err?.response?.data?.message || 'Error al suspender')) }
-    setTimeout(() => setMsg(null), 4000)
+      loadOperadores()
+    } catch (err) { showMsg('Error: ' + (err?.response?.data?.message || 'Error al suspender')) }
   }
 
   function toggleAdminStatus(u) {
     if (u.estado_cuenta === 'Activo' || !u.estado_cuenta) { setSuspendAdminModal(u); setSuspendAdminReason(''); return }
     updateUsuarioEstado(u.id_usuario, 'Activo').then(() => {
-      setMsg('Admin activado correctamente')
-      getUsuarios('admin').then(d => { if (Array.isArray(d)) setAdmins(d) }).catch(() => {})
-    }).catch(err => setMsg('Error: ' + (err?.response?.data?.message || 'Error al activar')))
-    setTimeout(() => setMsg(null), 4000)
+      showMsg('Admin activado correctamente')
+      loadAdmins()
+    }).catch(err => showMsg('Error: ' + (err?.response?.data?.message || 'Error al activar')))
   }
 
   async function confirmSuspendAdmin() {
     if (!suspendAdminModal || !suspendAdminReason.trim()) return
     try {
       await updateUsuarioEstado(suspendAdminModal.id_usuario, 'Suspendido', suspendAdminReason.trim())
-      setMsg('Admin suspendido correctamente')
+      showMsg('Admin suspendido correctamente')
       setSuspendAdminModal(null); setSuspendAdminReason('')
-      getUsuarios('admin').then(d => { if (Array.isArray(d)) setAdmins(d) }).catch(() => {})
-    } catch (err) { setMsg('Error: ' + (err?.response?.data?.message || 'Error al suspender')) }
-    setTimeout(() => setMsg(null), 4000)
+      loadAdmins()
+    } catch (err) { showMsg('Error: ' + (err?.response?.data?.message || 'Error al suspender')) }
   }
 
   async function handleViewOpSuspension(op) {
     try { const data = await getSuspensionesByUsuario(op.id_usuario); setOpSuspensionInfo(data) }
-    catch { setMsg('Error al cargar suspensiones') }
+    catch { showMsg('Error al cargar suspensiones') }
   }
 
   async function handleViewAdminSuspension(u) {
     try { const data = await getSuspensionesByUsuario(u.id_usuario); setAdminSuspensionInfo(data) }
-    catch { setMsg('Error al cargar suspensiones') }
+    catch { showMsg('Error al cargar suspensiones') }
   }
 
   function startEditOp(op) {
@@ -344,13 +368,10 @@ export default function UserManagementPage() {
     if (!editingOp) return
     try {
       await updateOperador(editingOp.id_operador, editOpForm)
-      setMsg('Operador actualizado correctamente')
+      showMsg('Operador actualizado correctamente')
       setEditingOp(null)
-      getOperadores().then(data => setOperadores(Array.isArray(data) ? data : data?.operadores || [])).catch(() => {})
-    } catch (err) {
-      setMsg('Error: ' + (err?.response?.data?.message || 'Error al actualizar'))
-    }
-    setTimeout(() => setMsg(null), 4000)
+      loadOperadores()
+    } catch (err) { showMsg('Error: ' + (err?.response?.data?.message || 'Error al actualizar')) }
   }
 
   function startEditFarm(farm) {
@@ -376,14 +397,11 @@ export default function UserManagementPage() {
         payload.lng = String(editFarmMarkerPos.lng)
       }
       await updateFarmacia(editingFarm.id_farmacia, payload)
-      setMsg('Farmacia actualizada correctamente')
+      showMsg('Farmacia actualizada correctamente')
       setEditingFarm(null)
       setEditFarmMarkerPos(null)
-      getFarmacias().then(data => setFarmacias(Array.isArray(data) ? data : data?.farmacias || [])).catch(() => {})
-    } catch (err) {
-      setMsg('Error: ' + (err?.response?.data?.message || 'Error al actualizar'))
-    }
-    setTimeout(() => setMsg(null), 4000)
+      loadFarmacias()
+    } catch (err) { showMsg('Error: ' + (err?.response?.data?.message || 'Error al actualizar')) }
   }
 
   async function handleAdminSubmit(e) {
@@ -400,12 +418,12 @@ export default function UserManagementPage() {
         tipo_usuario: 'admin',
       })
       setLastCredentials({ email: adminForm.email, password: adminForm.password })
-      setMsg('Administrador registrado correctamente')
+      showMsg('Administrador registrado correctamente')
       setAdminForm({ nombre: '', apellido: '', cedula: '', email: '', password: '', telefono: '' })
+      loadAdmins()
     } catch (err) {
-      setMsg('Error: ' + (err?.response?.data?.message || err?.response?.data?.error || 'Error al registrar'))
+      showMsg('Error: ' + (err?.response?.data?.message || err?.response?.data?.error || 'Error al registrar'))
     }
-    setTimeout(() => setMsg(null), 5000)
   }
 
   function requestDelete(type, item) {
@@ -418,26 +436,63 @@ export default function UserManagementPage() {
       const { type, item } = confirmDelete
       if (type === 'operador') {
         await removeOperador(item.id_operador)
-        setMsg('Operador eliminado correctamente')
+        showMsg('Operador eliminado correctamente')
+        loadOperadores()
       } else if (type === 'farmacia') {
         await removeFarmacia(item.id_farmacia)
-        setMsg('Farmacia eliminada correctamente')
+        showMsg('Farmacia eliminada correctamente')
+        loadFarmacias()
+        loadFarmUsuarios()
       } else {
         await removeUsuario(item.id_usuario)
-        setMsg('Usuario eliminado correctamente')
+        showMsg('Usuario eliminado correctamente')
+        loadAdmins()
       }
       setConfirmDelete(null)
-      if (type === 'operador') {
-        getOperadores().then(d => setOperadores(Array.isArray(d) ? d : d?.operadores || [])).catch(() => {})
-      } else if (type === 'farmacia') {
-        getFarmacias().then(d => setFarmacias(Array.isArray(d) ? d : d?.farmacias || [])).catch(() => {})
-      } else {
-        getUsuarios('admin').then(d => { if (Array.isArray(d)) setAdmins(d) }).catch(() => {})
-      }
-    } catch (err) {
-      setMsg('Error: ' + (err?.response?.data?.message || 'Error al eliminar'))
-    }
-    setTimeout(() => setMsg(null), 4000)
+    } catch (err) { showMsg('Error: ' + (err?.response?.data?.message || 'Error al eliminar')) }
+  }
+
+  function Pagination({ page, totalPages, total, onPageChange }) {
+    if (totalPages <= 1) return null
+    return (
+      <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
+        <p className="text-xs text-gray-500">Mostrando página {page} de {totalPages} ({total} resultados)</p>
+        <div className="flex items-center gap-1">
+          <button onClick={() => onPageChange(page - 1)} disabled={page <= 1} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">Anterior</button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+            <button key={p} onClick={() => onPageChange(p)} className={`w-9 h-9 rounded-lg text-sm font-bold transition-all ${p === page ? 'bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-gray-600 hover:bg-gray-100'}`}>{p}</button>
+          ))}
+          <button onClick={() => onPageChange(page + 1)} disabled={page >= totalPages} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">Siguiente</button>
+        </div>
+      </div>
+    )
+  }
+
+  function SearchBar({ value, onChange, placeholder }) {
+    return (
+      <div className="relative">
+        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+        <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 focus:bg-white transition-all w-56" />
+      </div>
+    )
+  }
+
+  function CollapsibleForm({ show, onToggle, icon, iconBg, title, subtitle, children }) {
+    return (
+      <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 p-6 mb-6">
+        <button onClick={onToggle} className="w-full flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className={`w-12 h-12 rounded-2xl ${iconBg} flex items-center justify-center text-white text-lg font-bold shadow-lg`}>{icon}</div>
+            <div className="text-left">
+              <h3 className="text-lg font-bold text-gray-900 font-['Plus_Jakarta_Sans']">{title}</h3>
+              <p className="text-sm text-gray-400 mt-0.5">{subtitle}</p>
+            </div>
+          </div>
+          <svg className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${show ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+        </button>
+        {show && <div className="mt-6 pt-6 border-t border-gray-100">{children}</div>}
+      </div>
+    )
   }
 
   return (
@@ -466,75 +521,39 @@ export default function UserManagementPage() {
       )}
 
       <div className="flex gap-2 mb-8">
-        <button onClick={() => setTab('operador')}
-          className={`text-sm font-bold px-6 py-3 rounded-2xl transition-all duration-200 ${tab === 'operador' ? 'bg-gray-900 text-white shadow-lg shadow-gray-900/20' : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700 shadow-sm'}`}>
-          Registrar Operador
-        </button>
-        <button onClick={() => setTab('farmacia')}
-          className={`text-sm font-bold px-6 py-3 rounded-2xl transition-all duration-200 ${tab === 'farmacia' ? 'bg-gray-900 text-white shadow-lg shadow-gray-900/20' : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700 shadow-sm'}`}>
-          Registrar Farmacia
-        </button>
-        <button onClick={() => setTab('admin')}
-          className={`text-sm font-bold px-6 py-3 rounded-2xl transition-all duration-200 ${tab === 'admin' ? 'bg-gray-900 text-white shadow-lg shadow-gray-900/20' : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700 shadow-sm'}`}>
-          Registrar Admin
-        </button>
+        <button onClick={() => setTab('operador')} className={`text-sm font-bold px-6 py-3 rounded-2xl transition-all duration-200 ${tab === 'operador' ? 'bg-gray-900 text-white shadow-lg shadow-gray-900/20' : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700 shadow-sm'}`}>Registrar Operador</button>
+        <button onClick={() => setTab('farmacia')} className={`text-sm font-bold px-6 py-3 rounded-2xl transition-all duration-200 ${tab === 'farmacia' ? 'bg-gray-900 text-white shadow-lg shadow-gray-900/20' : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700 shadow-sm'}`}>Registrar Farmacia</button>
+        <button onClick={() => setTab('admin')} className={`text-sm font-bold px-6 py-3 rounded-2xl transition-all duration-200 ${tab === 'admin' ? 'bg-gray-900 text-white shadow-lg shadow-gray-900/20' : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700 shadow-sm'}`}>Registrar Admin</button>
       </div>
 
       {tab === 'operador' ? (
         <>
-          <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 p-8 mb-6">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white text-lg font-bold shadow-lg shadow-blue-500/20">O</div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Registrar nuevo operador</h3>
-                <p className="text-sm text-gray-400 mt-0.5">Complete los datos del operador de drones</p>
-              </div>
-            </div>
+          <CollapsibleForm show={showOpForm} onToggle={() => setShowOpForm(!showOpForm)} icon="O" iconBg="bg-gradient-to-br from-sky-500 to-blue-600" title="Registrar nuevo operador" subtitle="Complete los datos del operador de drones">
             <form onSubmit={handleOpSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className={labelClass}>Nombre</label>
-                  <input value={opForm.nombre} onChange={e => setOpForm({ ...opForm, nombre: e.target.value })} placeholder="Ej. Carlos" className={inputClass} required />
-                </div>
-                <div>
-                  <label className={labelClass}>Apellido</label>
-                  <input value={opForm.apellido} onChange={e => setOpForm({ ...opForm, apellido: e.target.value })} placeholder="Ej. Gomez" className={inputClass} />
-                </div>
-                <div>
-                  <label className={labelClass}>Correo electrónico</label>
-                  <input type="email" value={opForm.correo} onChange={e => setOpForm({ ...opForm, correo: e.target.value })} placeholder="Ej. carlos@correo.com" className={inputClass} required />
-                </div>
-                <div>
-                  <label className={labelClass}>Teléfono</label>
-                  <input value={opForm.telefono} onChange={e => setOpForm({ ...opForm, telefono: e.target.value })} placeholder="Ej. 0412-1234567" className={inputClass} />
-                </div>
+                <div><label className={labelClass}>Nombre</label><input value={opForm.nombre} onChange={e => setOpForm({ ...opForm, nombre: e.target.value })} placeholder="Ej. Carlos" className={inputClass} required /></div>
+                <div><label className={labelClass}>Apellido</label><input value={opForm.apellido} onChange={e => setOpForm({ ...opForm, apellido: e.target.value })} placeholder="Ej. Gomez" className={inputClass} /></div>
+                <div><label className={labelClass}>Correo electrónico</label><input type="email" value={opForm.correo} onChange={e => setOpForm({ ...opForm, correo: e.target.value })} placeholder="Ej. carlos@correo.com" className={inputClass} required /></div>
+                <div><label className={labelClass}>Teléfono</label><input value={opForm.telefono} onChange={e => setOpForm({ ...opForm, telefono: e.target.value })} placeholder="Ej. 0412-1234567" className={inputClass} /></div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className={labelClass}>Cedula</label>
-                  <input value={opForm.cedula} onChange={e => setOpForm({ ...opForm, cedula: e.target.value })} placeholder="Ej. V-12345678" className={inputClass} required />
-                </div>
-                <div>
-                  <label className={labelClass}>Numero de licencia</label>
-                  <input value={opForm.licencia} onChange={e => setOpForm({ ...opForm, licencia: e.target.value })} placeholder="Ej. LIC-2024-001" className={inputClass} required />
-                </div>
-                <div>
-                  <label className={labelClass}>Horas de vuelo acumuladas</label>
-                  <input type="number" min="0" value={opForm.horas_vuelo} onChange={e => setOpForm({ ...opForm, horas_vuelo: e.target.value })} placeholder="Ej. 150" className={inputClass} />
-                </div>
+                <div><label className={labelClass}>Cedula</label><input value={opForm.cedula} onChange={e => setOpForm({ ...opForm, cedula: e.target.value })} placeholder="Ej. V-12345678" className={inputClass} required /></div>
+                <div><label className={labelClass}>Numero de licencia</label><input value={opForm.licencia} onChange={e => setOpForm({ ...opForm, licencia: e.target.value })} placeholder="Ej. LIC-2024-001" className={inputClass} required /></div>
+                <div><label className={labelClass}>Horas de vuelo acumuladas</label><input type="number" min="0" value={opForm.horas_vuelo} onChange={e => setOpForm({ ...opForm, horas_vuelo: e.target.value })} placeholder="Ej. 150" className={inputClass} /></div>
               </div>
-              <button type="submit" className="w-full bg-gradient-to-r from-sky-600 to-blue-700 text-white font-bold py-3.5 rounded-2xl transition-all duration-200 shadow-lg shadow-blue-500/25 hover:shadow-xl active:scale-[0.98]">
-                Registrar operador
-              </button>
+              <button type="submit" className="w-full bg-gradient-to-r from-sky-600 to-blue-700 text-white font-bold py-3.5 rounded-2xl transition-all duration-200 shadow-lg shadow-blue-500/25 hover:shadow-xl active:scale-[0.98]">Registrar operador</button>
             </form>
-          </div>
+          </CollapsibleForm>
 
           <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 p-6">
-            <h3 className="text-sm font-bold text-gray-800 mb-4 font-['Plus_Jakarta_Sans']">Operadores registrados</h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">Operadores registrados ({totalOp})</h3>
+              <SearchBar value={searchInputOp} onChange={setSearchInputOp} placeholder="Buscar operador..." />
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                    <tr className="text-xs font-semibold text-gray-500 uppercase tracking-widest border-b border-gray-100">
+                  <tr className="text-xs font-semibold text-gray-500 uppercase tracking-widest border-b border-gray-100">
                     <th className="text-left pb-3 pr-4 w-10"></th>
                     <th className="text-left pb-3 pr-4">Nombre</th>
                     <th className="text-left pb-3 pr-4">Email</th>
@@ -548,12 +567,10 @@ export default function UserManagementPage() {
                   {operadores.length === 0 ? (
                     <tr><td colSpan="7" className="py-8 text-center text-gray-400 text-sm">No hay operadores registrados</td></tr>
                   ) : (
-                    operadores.map((op, i) => (
+                    operadores.map((op) => (
                       <tr key={op.id_operador} className="border-b border-gray-50">
                         <td className="py-3 pr-4">
-                          <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden">
-                            {op.foto_url || op.usuario?.foto_url ? <img src={op.foto_url || op.usuario?.foto_url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400 text-[10px] font-bold">{op.nombre_operador?.charAt(0) || '?'}</div>}
-                          </div>
+                          <Avatar src={op.foto_url || op.usuario?.foto_url} name={op.nombre_operador} size="sm" />
                         </td>
                         <td className="py-3 pr-4 font-semibold text-gray-800">{op.nombre_operador}{op.apellido ? ' ' + op.apellido : ''}</td>
                         <td className="py-3 pr-4 text-gray-600">{op.email}</td>
@@ -590,132 +607,95 @@ export default function UserManagementPage() {
                 </tbody>
               </table>
             </div>
+            <Pagination page={pageOp} totalPages={totalPagesOp} total={totalOp} onPageChange={(p) => loadOperadores(p, searchOp)} />
           </div>
         </>
       ) : tab === 'admin' ? (
         <>
-        <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 p-8">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center text-white text-lg font-bold shadow-lg shadow-purple-500/20">A</div>
-            <div>
-              <h3 className="text-lg font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Registrar nuevo administrador</h3>
-              <p className="text-sm text-gray-400 mt-0.5">Cree una cuenta con permisos de administrador</p>
-            </div>
-          </div>
-          <form onSubmit={handleAdminSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
-                <label className={labelClass}>Nombre</label>
-                <input value={adminForm.nombre} onChange={e => setAdminForm({ ...adminForm, nombre: e.target.value })} placeholder="Ej. Luis" className={inputClass} required />
+          <CollapsibleForm show={showAdminForm} onToggle={() => setShowAdminForm(!showAdminForm)} icon="A" iconBg="bg-gradient-to-br from-violet-500 to-purple-700" title="Registrar nuevo administrador" subtitle="Cree una cuenta con permisos de administrador">
+            <form onSubmit={handleAdminSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div><label className={labelClass}>Nombre</label><input value={adminForm.nombre} onChange={e => setAdminForm({ ...adminForm, nombre: e.target.value })} placeholder="Ej. Luis" className={inputClass} required /></div>
+                <div><label className={labelClass}>Apellido</label><input value={adminForm.apellido} onChange={e => setAdminForm({ ...adminForm, apellido: e.target.value })} placeholder="Ej. Perez" className={inputClass} /></div>
+                <div><label className={labelClass}>Cédula</label><input value={adminForm.cedula} onChange={e => setAdminForm({ ...adminForm, cedula: e.target.value })} placeholder="Ej. V-12345678" className={inputClass} /></div>
+                <div><label className={labelClass}>Teléfono</label><input value={adminForm.telefono} onChange={e => setAdminForm({ ...adminForm, telefono: e.target.value })} placeholder="Ej. 0412-1234567" className={inputClass} /></div>
               </div>
-              <div>
-                <label className={labelClass}>Apellido</label>
-                <input value={adminForm.apellido} onChange={e => setAdminForm({ ...adminForm, apellido: e.target.value })} placeholder="Ej. Perez" className={inputClass} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div><label className={labelClass}>Correo electrónico</label><input type="email" value={adminForm.email} onChange={e => setAdminForm({ ...adminForm, email: e.target.value })} placeholder="Ej. admin@dronsalud.com" className={inputClass} required /></div>
+                <div><label className={labelClass}>Contraseña</label><input type="password" value={adminForm.password} onChange={e => setAdminForm({ ...adminForm, password: e.target.value })} placeholder="Min. 6 caracteres" className={inputClass} required /></div>
               </div>
-              <div>
-                <label className={labelClass}>Cédula</label>
-                <input value={adminForm.cedula} onChange={e => setAdminForm({ ...adminForm, cedula: e.target.value })} placeholder="Ej. V-12345678" className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Teléfono</label>
-                <input value={adminForm.telefono} onChange={e => setAdminForm({ ...adminForm, telefono: e.target.value })} placeholder="Ej. 0412-1234567" className={inputClass} />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
-                <label className={labelClass}>Correo electrónico</label>
-                <input type="email" value={adminForm.email} onChange={e => setAdminForm({ ...adminForm, email: e.target.value })} placeholder="Ej. admin@dronsalud.com" className={inputClass} required />
-              </div>
-              <div>
-                <label className={labelClass}>Contraseña</label>
-                <input type="password" value={adminForm.password} onChange={e => setAdminForm({ ...adminForm, password: e.target.value })} placeholder="Min. 6 caracteres" className={inputClass} required />
-              </div>
-            </div>
-            <button type="submit" className="w-full bg-gradient-to-r from-violet-600 to-purple-700 text-white font-bold py-3.5 rounded-2xl transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-xl active:scale-[0.98]">
-              Registrar administrador
-            </button>
-          </form>
-        </div>
+              <button type="submit" className="w-full bg-gradient-to-r from-violet-600 to-purple-700 text-white font-bold py-3.5 rounded-2xl transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-xl active:scale-[0.98]">Registrar administrador</button>
+            </form>
+          </CollapsibleForm>
 
-        <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 p-6">
-          <h3 className="text-sm font-bold text-gray-800 mb-4 font-['Plus_Jakarta_Sans']">Administradores registrados</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs font-semibold text-gray-500 uppercase tracking-widest border-b border-gray-100">
-                  <th className="text-left pb-3 pr-4 w-10"></th>
-                  <th className="text-left pb-3 pr-4">Nombre</th>
-                  <th className="text-left pb-3 pr-4">Email</th>
-                  <th className="text-left pb-3 pr-4">Teléfono</th>
-                  <th className="text-left pb-3 pr-4">Estado</th>
-                  <th className="text-left pb-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {admins.length === 0 ? (
-                  <tr><td colSpan="6" className="py-8 text-center text-gray-400 text-sm">No hay administradores registrados</td></tr>
-                ) : (
-                  admins.map(u => (
-                    <tr key={u.id_usuario} className="border-b border-gray-50">
-                      <td className="py-3 pr-4">
-                        <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden">
-                          {u.foto_url ? <img src={u.foto_url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400 text-[10px] font-bold">{u.nombre?.charAt(0) || '?'}</div>}
-                        </div>
-                      </td>
-                      <td className="py-3 pr-4 font-semibold text-gray-800">{u.nombre} {u.apellido || ''}</td>
-                      <td className="py-3 pr-4 text-gray-600">{u.email}</td>
-                      <td className="py-3 pr-4 text-gray-600">{u.telefono || '—'}</td>
-                      <td className="py-3 pr-4">
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${u.estado_cuenta === 'Activo' ? 'bg-emerald-50 text-emerald-600' : u.estado_cuenta === 'Suspendido' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600'}`}>
-                          {u.estado_cuenta}
-                        </span>
-                      </td>
-                      <td className="py-3">
-                        <div className="flex gap-1.5">
-                          <button onClick={() => toggleAdminStatus(u)} className={`p-1.5 rounded-lg transition-all ${u.estado_cuenta === 'Suspendido' ? 'text-red-500 hover:text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'}`} title={u.estado_cuenta === 'Suspendido' ? 'Reactivar cuenta' : 'Suspender cuenta'}>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                          </button>
-                          <button onClick={() => handleViewAdminSuspension(u)} className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-all" title="Historial suspensiones">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                          </button>
-                          <button onClick={() => setConfirmDelete({ type: 'usuario', item: u })} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all" title="Eliminar">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">Administradores registrados ({totalAdmin})</h3>
+              <SearchBar value={searchInputAdmin} onChange={setSearchInputAdmin} placeholder="Buscar admin..." />
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs font-semibold text-gray-500 uppercase tracking-widest border-b border-gray-100">
+                    <th className="text-left pb-3 pr-4 w-10"></th>
+                    <th className="text-left pb-3 pr-4">Nombre</th>
+                    <th className="text-left pb-3 pr-4">Email</th>
+                    <th className="text-left pb-3 pr-4">Teléfono</th>
+                    <th className="text-left pb-3 pr-4">Estado</th>
+                    <th className="text-left pb-3">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {admins.length === 0 ? (
+                    <tr><td colSpan="6" className="py-8 text-center text-gray-400 text-sm">No hay administradores registrados</td></tr>
+                  ) : (
+                    admins.map(u => (
+                      <tr key={u.id_usuario} className="border-b border-gray-50">
+                        <td className="py-3 pr-4">
+                          <Avatar src={u.foto_url} name={u.nombre} size="sm" />
+                        </td>
+                        <td className="py-3 pr-4 font-semibold text-gray-800">{u.nombre} {u.apellido || ''}</td>
+                        <td className="py-3 pr-4 text-gray-600">{u.email}</td>
+                        <td className="py-3 pr-4 text-gray-600">{u.telefono || '—'}</td>
+                        <td className="py-3 pr-4">
+                          <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${u.estado_cuenta === 'Activo' ? 'bg-emerald-50 text-emerald-600' : u.estado_cuenta === 'Suspendido' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600'}`}>
+                            {u.estado_cuenta}
+                          </span>
+                        </td>
+                        <td className="py-3">
+                          <div className="flex gap-1.5">
+                            <button onClick={() => toggleAdminStatus(u)} className={`p-1.5 rounded-lg transition-all ${u.estado_cuenta === 'Suspendido' ? 'text-red-500 hover:text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'}`} title={u.estado_cuenta === 'Suspendido' ? 'Reactivar cuenta' : 'Suspender cuenta'}>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                            </button>
+                            <button onClick={() => handleViewAdminSuspension(u)} className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-all" title="Historial suspensiones">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            </button>
+                            <button onClick={() => setConfirmDelete({ type: 'usuario', item: u })} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all" title="Eliminar">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={pageAdmin} totalPages={totalPagesAdmin} total={totalAdmin} onPageChange={(p) => loadAdmins(p, searchAdmin)} />
           </div>
-        </div>
         </>
       ) : (
         <>
-          <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 p-8 mb-6">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white text-lg font-bold shadow-lg shadow-emerald-500/20">F</div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 font-['Plus_Jakarta_Sans']">Registrar nueva farmacia</h3>
-                <p className="text-sm text-gray-400 mt-0.5">Haga clic en el mapa para ubicar la farmacia</p>
-              </div>
-            </div>
+          <CollapsibleForm show={showFarmForm} onToggle={() => setShowFarmForm(!showFarmForm)} icon="F" iconBg="bg-gradient-to-br from-emerald-500 to-teal-600" title="Registrar nueva farmacia" subtitle="Haga clic en el mapa para ubicar la farmacia">
             <form onSubmit={handleFarmSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className={labelClass}>Nombre</label>
-                  <input value={farmForm.nombre_comercial} onChange={e => setFarmForm({ ...farmForm, nombre_comercial: e.target.value })} placeholder="Ej. Farmatodo" className={inputClass} required />
-                </div>
-                <div>
-                  <label className={labelClass}>RIF</label>
-                  <input value={farmForm.rif} onChange={e => setFarmForm({ ...farmForm, rif: e.target.value })} placeholder="Ej. J-12345678-9" className={inputClass} required />
-                </div>
+                <div><label className={labelClass}>Nombre</label><input value={farmForm.nombre_comercial} onChange={e => setFarmForm({ ...farmForm, nombre_comercial: e.target.value })} placeholder="Ej. Farmatodo" className={inputClass} required /></div>
+                <div><label className={labelClass}>RIF</label><input value={farmForm.rif} onChange={e => setFarmForm({ ...farmForm, rif: e.target.value })} placeholder="Ej. J-12345678-9" className={inputClass} required /></div>
               </div>
               <div>
                 <label className={labelClass}>Ubicacion</label>
                 <div className="h-[280px] rounded-2xl overflow-hidden border border-gray-200 mb-3">
-                  <MapContainer center={CENTER} zoom={14} className="h-full w-full" zoomControl={false} maxBounds={TACHIRA_BOUNDS} maxBoundsViscosity={1}>
+                  <MapContainer key={showFarmForm ? 'visible' : 'hidden'} center={CENTER} zoom={14} className="h-full w-full" zoomControl={false} maxBounds={TACHIRA_BOUNDS} maxBoundsViscosity={1}>
                     <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                     <ClickMarker position={markerPos} onMove={(pos) => setMarkerPos(pos)} />
                     <MapBoundsController />
@@ -730,35 +710,24 @@ export default function UserManagementPage() {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className={labelClass}>Ciudad</label>
-                  <input value={farmForm.ciudad} onChange={e => setFarmForm({ ...farmForm, ciudad: e.target.value })} placeholder="San Cristóbal" className={inputClass} />
-                </div>
-                <div>
-                  <label className={labelClass}>Correo electronico</label>
-                  <input type="email" value={farmForm.correo} onChange={e => setFarmForm({ ...farmForm, correo: e.target.value })} placeholder="Ej. contacto@farmacia.com" className={inputClass} />
-                </div>
-                <div>
-                  <label className={labelClass}>Numero de telefono</label>
-                  <input value={farmForm.telefono} onChange={e => setFarmForm({ ...farmForm, telefono: e.target.value })} placeholder="Ej. 0276-3561234" className={inputClass} />
-                </div>
-                <div>
-                  <label className={labelClass}>Telefono del responsable</label>
-                  <input value={farmForm.telefono_responsable} onChange={e => setFarmForm({ ...farmForm, telefono_responsable: e.target.value })} placeholder="Ej. 0412-1234567" className={inputClass} />
-                </div>
+                <div><label className={labelClass}>Ciudad</label><input value={farmForm.ciudad} onChange={e => setFarmForm({ ...farmForm, ciudad: e.target.value })} placeholder="San Cristóbal" className={inputClass} /></div>
+                <div><label className={labelClass}>Correo electronico</label><input type="email" value={farmForm.correo} onChange={e => setFarmForm({ ...farmForm, correo: e.target.value })} placeholder="Ej. contacto@farmacia.com" className={inputClass} /></div>
+                <div><label className={labelClass}>Numero de telefono</label><input value={farmForm.telefono} onChange={e => setFarmForm({ ...farmForm, telefono: e.target.value })} placeholder="Ej. 0276-3561234" className={inputClass} /></div>
+                <div><label className={labelClass}>Telefono del responsable</label><input value={farmForm.telefono_responsable} onChange={e => setFarmForm({ ...farmForm, telefono_responsable: e.target.value })} placeholder="Ej. 0412-1234567" className={inputClass} /></div>
               </div>
-              <button type="submit" className="w-full bg-gradient-to-r from-emerald-600 to-teal-700 text-white font-bold py-3.5 rounded-2xl transition-all duration-200 shadow-lg shadow-emerald-500/25 hover:shadow-xl active:scale-[0.98]">
-                Registrar farmacia
-              </button>
+              <button type="submit" className="w-full bg-gradient-to-r from-emerald-600 to-teal-700 text-white font-bold py-3.5 rounded-2xl transition-all duration-200 shadow-lg shadow-emerald-500/25 hover:shadow-xl active:scale-[0.98]">Registrar farmacia</button>
             </form>
-          </div>
+          </CollapsibleForm>
 
           <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 p-6">
-            <h3 className="text-sm font-bold text-gray-800 mb-4 font-['Plus_Jakarta_Sans']">Farmacias registradas</h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">Farmacias registradas ({totalFarm})</h3>
+              <SearchBar value={searchInputFarm} onChange={setSearchInputFarm} placeholder="Buscar farmacia..." />
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                    <tr className="text-xs font-semibold text-gray-500 uppercase tracking-widest border-b border-gray-100">
+                  <tr className="text-xs font-semibold text-gray-500 uppercase tracking-widest border-b border-gray-100">
                     <th className="text-left pb-3 pr-4 w-10"></th>
                     <th className="text-left pb-3 pr-4">Nombre</th>
                     <th className="text-left pb-3 pr-4">Email</th>
@@ -772,12 +741,10 @@ export default function UserManagementPage() {
                   {farmacias.length === 0 ? (
                     <tr><td colSpan="7" className="py-8 text-center text-gray-400 text-sm">No hay farmacias registradas</td></tr>
                   ) : (
-                    farmacias.map((p, i) => (
+                    farmacias.map((p) => (
                       <tr key={p.id_farmacia} className="border-b border-gray-50">
                         <td className="py-3 pr-4">
-                          <div className="w-8 h-8 rounded-lg bg-gray-200 overflow-hidden">
-                            {p.logo_url ? <img src={p.logo_url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400 text-[10px] font-bold">{p.nombre_comercial?.charAt(0) || '?'}</div>}
-                          </div>
+                          <Avatar src={p.logo_url} name={p.nombre_comercial} size="sm" rounded="lg" />
                         </td>
                         <td className="py-3 pr-4 font-semibold text-gray-800">{p.nombre_comercial}</td>
                         <td className="py-3 pr-4 text-gray-600">{p.email || '—'}</td>
@@ -819,10 +786,11 @@ export default function UserManagementPage() {
                 </tbody>
               </table>
             </div>
+            <Pagination page={pageFarm} totalPages={totalPagesFarm} total={totalFarm} onPageChange={(p) => loadFarmacias(p, searchFarm)} />
           </div>
         </>
       )}
-      {/* Confirm delete modal */}
+
       {confirmDelete && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 w-full max-w-sm text-center">
@@ -847,7 +815,6 @@ export default function UserManagementPage() {
         </div>
       )}
 
-      {/* Edit operator modal */}
       {editingOp && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setEditingOp(null)}>
           <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-8 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
@@ -869,6 +836,17 @@ export default function UserManagementPage() {
                 <div><label className={labelClass}>Nro. licencia</label><input value={editOpForm.nro_licencia} onChange={e => setEditOpForm({ ...editOpForm, nro_licencia: e.target.value })} className={inputClass} /></div>
                 <div><label className={labelClass}>Horas de vuelo</label><input type="number" min="0" value={editOpForm.horas_vuelo} onChange={e => setEditOpForm({ ...editOpForm, horas_vuelo: e.target.value })} className={inputClass} /></div>
               </div>
+              <div className="flex flex-col items-center pt-2">
+                <label className={labelClass}>Foto de perfil</label>
+                {(editingOp.foto_url || editingOp.usuario?.foto_url) ? (
+                  <button onClick={() => setExpandedPhoto(editingOp.foto_url || editingOp.usuario?.foto_url)} className="cursor-pointer transition-transform hover:scale-105" title="Click para ampliar">
+                    <Avatar src={editingOp.foto_url || editingOp.usuario?.foto_url} name={editingOp.nombre_operador} size="xl" />
+                  </button>
+                ) : (
+                  <Avatar src={null} name={editingOp.nombre_operador} size="xl" />
+                )}
+                <p className="text-xs text-gray-400 mt-1">{(editingOp.foto_url || editingOp.usuario?.foto_url) ? 'Click para ampliar' : 'Sin foto'}</p>
+              </div>
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setEditingOp(null)} className="flex-1 py-3 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-all">Cancelar</button>
                 <button onClick={saveEditOp} className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-sky-600 to-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-500/25 hover:shadow-xl active:scale-[0.98] transition-all">Guardar cambios</button>
@@ -878,7 +856,6 @@ export default function UserManagementPage() {
         </div>
       )}
 
-      {/* Edit farmacia modal */}
       {editingFarm && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => { setEditingFarm(null); setEditFarmMarkerPos(null) }}>
           <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-8 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
@@ -915,6 +892,17 @@ export default function UserManagementPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div><label className={labelClass}>Teléfono</label><input value={editFarmForm.telefono} onChange={e => setEditFarmForm({ ...editFarmForm, telefono: e.target.value })} className={inputClass} /></div>
                 <div><label className={labelClass}>Tel. responsable</label><input value={editFarmForm.telefono_responsable} onChange={e => setEditFarmForm({ ...editFarmForm, telefono_responsable: e.target.value })} className={inputClass} /></div>
+              </div>
+              <div className="flex flex-col items-center pt-2">
+                <label className={labelClass}>Logo</label>
+                {editingFarm.logo_url ? (
+                  <button onClick={() => setExpandedPhoto(editingFarm.logo_url)} className="cursor-pointer transition-transform hover:scale-105" title="Click para ampliar">
+                    <Avatar src={editingFarm.logo_url} name={editingFarm.nombre_comercial} size="xl" rounded="xl" />
+                  </button>
+                ) : (
+                  <Avatar src={null} name={editingFarm.nombre_comercial} size="xl" rounded="xl" />
+                )}
+                <p className="text-xs text-gray-400 mt-1">{editingFarm.logo_url ? 'Click para ampliar' : 'Sin logo'}</p>
               </div>
               <div className="flex gap-3 pt-2">
                 <button onClick={() => { setEditingFarm(null); setEditFarmMarkerPos(null) }} className="flex-1 py-3 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-all">Cancelar</button>
@@ -1007,6 +995,15 @@ export default function UserManagementPage() {
               <button onClick={confirmSuspendFarm} disabled={!farmSuspendReason.trim()} className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-700 text-white font-bold text-sm shadow-lg shadow-amber-500/25 disabled:opacity-50">Suspender</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {expandedPhoto && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setExpandedPhoto(null)}>
+          <button onClick={() => setExpandedPhoto(null)} className="absolute top-6 right-6 p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all z-10">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+          <img src={expandedPhoto.startsWith('http') ? expandedPhoto : 'http://localhost:3000' + expandedPhoto} alt="Foto" className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()} />
         </div>
       )}
 
