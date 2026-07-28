@@ -139,7 +139,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <p className="text-sm text-gray-500">Resumen ejecutivo · {new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</p>
+        <p className="text-sm text-gray-500 dark:text-slate-400">Resumen ejecutivo · {new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</p>
       </div>
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
@@ -152,7 +152,7 @@ export default function DashboardPage() {
           return (
             <div key={card.key} className="relative group animate-fade-in-up" style={{ animationDelay: `${idx * 60}ms`, animationFillMode: 'both' }}>
               <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} rounded-2xl opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
-              <div className="relative bg-white rounded-2xl border border-gray-100 p-5 card-hover overflow-hidden">
+              <div className="relative bg-white dark:bg-slate-800/90 rounded-2xl border border-gray-100 dark:border-slate-700/50 p-5 card-hover overflow-hidden">
                 <div className={`absolute top-0 right-0 w-24 h-24 -mr-6 -mt-6 bg-gradient-to-br ${card.gradient} opacity-[0.04] rounded-full`} />
                 <div className="flex items-start justify-between mb-3">
                   <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${card.gradient} ${card.shadow} flex items-center justify-center text-white shadow-lg`}>
@@ -163,16 +163,16 @@ export default function DashboardPage() {
                   <>
                     <div className="flex items-baseline gap-4">
                       <div>
-                        <div className="text-[10px] text-gray-400 mb-0.5">Disponibles</div>
-                        <div className="text-xl text-gray-900 tracking-tight">{value.disponibles}</div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] text-gray-400 mb-0.5">Operativos</div>
-                        <div className="text-xl text-gray-900 tracking-tight">{value.operativos}</div>
+                         <div className="text-[10px] text-gray-400 dark:text-slate-500 mb-0.5">Disponibles</div>
+                         <div className="text-xl text-gray-900 dark:text-white tracking-tight">{value.disponibles}</div>
+                       </div>
+                       <div>
+                         <div className="text-[10px] text-gray-400 dark:text-slate-500 mb-0.5">Operativos</div>
+                         <div className="text-xl text-gray-900 dark:text-white tracking-tight">{value.operativos}</div>
                       </div>
                     </div>
                     <div className="mt-3 flex items-center justify-between">
-                      <div className="text-[10px] text-gray-300">{value.totales} registrados</div>
+                       <div className="text-[10px] text-gray-300 dark:text-slate-600">{value.totales} registrados</div>
                       <span className="text-[10px] text-sky-600">{value.capacidad}% op.</span>
                     </div>
                     <div className="mt-1 h-1 bg-gray-100 rounded-full overflow-hidden">
@@ -181,8 +181,8 @@ export default function DashboardPage() {
                   </>
                 ) : (
                   <>
-                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">{card.label}</div>
-                    <div className="text-2xl font-bold text-gray-900 font-['Plus_Jakarta_Sans'] tracking-tight">{displayValue}</div>
+                         <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">{card.label}</div>
+                     <div className="text-2xl font-bold text-gray-900 dark:text-white font-['Plus_Jakarta_Sans'] tracking-tight">{displayValue}</div>
                     <div className="mt-2 flex items-center gap-2">
                       {card.key === 'ingresos' && weeklyValues.length > 0 && <Sparkline data={weeklyValues} color="#059669" />}
                       <span className="text-[11px] font-medium text-gray-400">{badgeText}</span>
@@ -196,20 +196,20 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-5 grid-cols-1 xl:grid-cols-[1.4fr_1fr]">
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 card-hover">
+        <div className="bg-white dark:bg-slate-800/90 rounded-2xl border border-gray-100 dark:border-slate-700/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] p-6 card-hover">
           <div className="flex items-center justify-between mb-5">
-            <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">Envíos por Mes</h3>
-            <span className="text-[11px] text-gray-400 font-medium">Últimos meses</span>
+            <h3 className="text-sm font-bold text-gray-800 dark:text-white font-['Plus_Jakarta_Sans']">Envíos por Mes</h3>
+            <span className="text-[11px] text-gray-400 dark:text-slate-500 font-medium">Últimos meses</span>
           </div>
           <div className="h-[260px]">
             {monthlyData.length > 0 ? <AreaChartSVG data={monthlyData} dataKey="envios" /> : <p className="text-gray-400 text-sm text-center pt-20">Sin datos</p>}
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 card-hover">
+        <div className="bg-white dark:bg-slate-800/90 rounded-2xl border border-gray-100 dark:border-slate-700/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] p-6 card-hover">
           <div className="flex items-center justify-between mb-5">
-            <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">Estado de Pedidos</h3>
-            <span className="text-[11px] text-gray-400 font-medium">{stats.total} total</span>
+            <h3 className="text-sm font-bold text-gray-800 dark:text-white font-['Plus_Jakarta_Sans']">Estado de Pedidos</h3>
+            <span className="text-[11px] text-gray-400 dark:text-slate-500 font-medium">{stats.total} total</span>
           </div>
           <div className="flex items-center gap-6">
             <div className="w-[140px] h-[140px] flex-shrink-0">
@@ -220,9 +220,9 @@ export default function DashboardPage() {
                 <div key={d.estado} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
-                    <span className="text-xs font-medium text-gray-600">{d.estado}</span>
+                    <span className="text-xs font-medium text-gray-600 dark:text-slate-300">{d.estado}</span>
                   </div>
-                  <span className="text-xs font-bold text-gray-800">{d.valor}</span>
+                  <span className="text-xs font-bold text-gray-800 dark:text-slate-200">{d.valor}</span>
                 </div>
               ))}
             </div>
@@ -231,26 +231,26 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-5 grid-cols-1 xl:grid-cols-[1.4fr_1fr]">
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 card-hover">
+        <div className="bg-white dark:bg-slate-800/90 rounded-2xl border border-gray-100 dark:border-slate-700/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] p-6 card-hover">
           <div className="flex items-center justify-between mb-5">
-            <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">Farmacias con más Pedidos</h3>
-            <span className="text-[11px] text-gray-400 font-medium">Top 5</span>
+            <h3 className="text-sm font-bold text-gray-800 dark:text-white font-['Plus_Jakarta_Sans']">Farmacias con más Pedidos</h3>
+            <span className="text-[11px] text-gray-400 dark:text-slate-500 font-medium">Top 5</span>
           </div>
           <div className="h-[240px]">
             {barData.length > 0 ? <BarChartSVG data={barData} dataKey="pedidos" labelKey="nombre" /> : <p className="text-gray-400 text-sm text-center pt-20">Sin datos</p>}
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 card-hover">
+        <div className="bg-white dark:bg-slate-800/90 rounded-2xl border border-gray-100 dark:border-slate-700/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] p-6 card-hover">
           <div className="flex items-center justify-between mb-5">
-            <h3 className="text-sm font-bold text-gray-800 font-['Plus_Jakarta_Sans']">Pedidos Recientes</h3>
-            <span className="text-[11px] text-gray-400 font-medium">Últimos 4</span>
+            <h3 className="text-sm font-bold text-gray-800 dark:text-white font-['Plus_Jakarta_Sans']">Pedidos Recientes</h3>
+            <span className="text-[11px] text-gray-400 dark:text-slate-500 font-medium">Últimos 4</span>
           </div>
           <div className="space-y-2.5">
             {recentOrders.slice(0, 4).map((order) => {
               const farmacia = order.farmacia
               return (
-                <div key={order.id_pedido} className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 hover:bg-gray-100 transition-colors">
+                <div key={order.id_pedido} className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 dark:bg-slate-900/50 hover:bg-gray-100 dark:hover:bg-slate-800/50 transition-colors">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold ${
                       order.estado_pedido === 'Entregado' ? 'bg-emerald-500' :
@@ -260,8 +260,8 @@ export default function DashboardPage() {
                       {farmacia?.nombre_comercial?.charAt(0) || '?'}
                     </div>
                     <div className="min-w-0">
-                      <div className="text-xs font-semibold text-gray-800 truncate">#{order.id_pedido}</div>
-                      <div className="text-[10px] text-gray-400">{farmacia?.nombre_comercial || `Farmacia #${order.id_farmacia}`} · {order.fecha_creacion ? new Date(order.fecha_creacion).toLocaleDateString('es-ES') : ''}</div>
+                      <div className="text-xs font-semibold text-gray-800 dark:text-slate-200 truncate">#{order.id_pedido}</div>
+                      <div className="text-[10px] text-gray-400 dark:text-slate-500">{farmacia?.nombre_comercial || `Farmacia #${order.id_farmacia}`} · {order.fecha_creacion ? new Date(order.fecha_creacion).toLocaleDateString('es-ES') : ''}</div>
                     </div>
                   </div>
                   <span className={`text-[10px] font-bold px-2 py-1 rounded-full flex-shrink-0 ${

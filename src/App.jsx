@@ -3,6 +3,7 @@ import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
 import DashboardLayout from './layouts/DashboardLayout'
 import ShoppingPage from './pages/client/ShoppingPage'
+import { ThemeProvider } from './context/ThemeContext'
 
 const modules = [
   { key: 'dashboard', label: 'Panel', icon: 'LayoutDashboard', color: 'from-sky-500 to-blue-600' },
@@ -43,25 +44,40 @@ function App() {
   const [view, setView] = useState('login')
   const [currentUser, setCurrentUser] = useState(null)
 
-  console.log('App render:', { view, currentUser })
-
-  if (view === 'register') {
-    return (
-      <RegisterPage
-        onBackToLogin={() => setView('login')}
-        onLoginSuccess={(user) => {
-          setCurrentUser(user)
-          setView('panel')
-        }}
-      />
-    )
-  }
-
-  if (view === 'panel' && currentUser) {
-    console.log('User role:', currentUser.role)
-    if (currentUser.role === 'cliente') {
+  const renderPage = () => {
+    if (view === 'register') {
       return (
-        <ShoppingPage
+        <RegisterPage
+          onBackToLogin={() => setView('login')}
+          onLoginSuccess={(user) => {
+            setCurrentUser(user)
+            setView('panel')
+          }}
+        />
+      )
+    }
+
+    if (view === 'panel' && currentUser) {
+      if (currentUser.role === 'cliente') {
+        return (
+          <ShoppingPage
+            user={currentUser}
+            onLogout={() => {
+              setView('login')
+              setCurrentUser(null)
+            }}
+            onUpdateUser={(updated) => setCurrentUser(updated)}
+          />
+        )
+      }
+
+      const allowedKeys = roleModules[currentUser.role] || roleModules.admin
+      const allowedModules = modules.filter((m) => allowedKeys.includes(m.key))
+
+      return (
+        <DashboardLayout
+          modules={allowedModules}
+          moduleTitles={moduleTitles}
           user={currentUser}
           onLogout={() => {
             setView('login')
@@ -72,33 +88,18 @@ function App() {
       )
     }
 
-    const allowedKeys = roleModules[currentUser.role] || roleModules.admin
-    const allowedModules = modules.filter((m) => allowedKeys.includes(m.key))
-
     return (
-      <DashboardLayout
-        modules={allowedModules}
-        moduleTitles={moduleTitles}
-        user={currentUser}
-        onLogout={() => {
-          setView('login')
-          setCurrentUser(null)
+      <LoginPage
+        onCreateAccount={() => setView('register')}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user)
+          setView('panel')
         }}
-        onUpdateUser={(updated) => setCurrentUser(updated)}
       />
     )
   }
 
-  return (
-    <LoginPage
-      onCreateAccount={() => setView('register')}
-      onLoginSuccess={(user) => {
-        console.log('Login success:', user)
-        setCurrentUser(user)
-        setView('panel')
-      }}
-    />
-  )
+  return <ThemeProvider>{renderPage()}</ThemeProvider>
 }
 
 export default App
